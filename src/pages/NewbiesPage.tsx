@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import ClassBadge from '../components/ClassBadge';
+import { useAuth } from '../app/useAuth';
 import { fetchClasses } from '../data/classes';
 import { fetchNewbieTotals, fetchNewbies } from '../data/newbies';
 import type { ClassRow, Newbie } from '../data/types';
@@ -17,8 +18,10 @@ interface Row extends Newbie {
 }
 
 export default function NewbiesPage() {
+  const { isAdmin } = useAuth();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const columns = isAdmin ? 'minmax(150px, 1fr) 160px 120px' : 'minmax(150px, 1fr) 160px';
 
   useEffect(() => {
     let cancelled = false;
@@ -52,19 +55,19 @@ export default function NewbiesPage() {
 
       {rows && (
         <div className="rowlist">
-          <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 160px 120px' }}>
+          <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
             <span>Нікнейм</span>
             <span>Клас</span>
-            <span>Бали</span>
+            {isAdmin && <span>Бали</span>}
           </div>
           {rows.length === 0 ? (
             <p className="rowlist-empty hint">Новачків ще немає.</p>
           ) : (
             rows.map((r) => (
-              <div key={r.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 160px 120px' }}>
+              <div key={r.id} className="rowlist-row" style={{ gridTemplateColumns: columns }}>
                 <span>{r.nickname}</span>
                 <span><ClassBadge cls={r.cls} /></span>
-                <span style={{ fontWeight: 700 }}>{r.totalPoints}</span>
+                {isAdmin && <span style={{ fontWeight: 700 }}>{r.totalPoints}</span>}
               </div>
             ))
           )}
