@@ -103,13 +103,13 @@ export default function R8FarmPage() {
             <p className="hint">Шмоток ще не додано (керування — на сторінці «Р8»).</p>
           ) : (
             <div className="rowlist" style={{ marginBottom: 24 }}>
-              <div className="rowlist-head" style={{ gridTemplateColumns: '28px 1fr 140px' }}>
+              <div className="rowlist-head" style={{ gridTemplateColumns: '28px minmax(150px, 1fr) 140px' }}>
                 <span></span>
                 <span>Шмотка</span>
                 <span>Ціна</span>
               </div>
               {gearItems.map((g) => (
-                <div key={g.id} className="rowlist-row" style={{ gridTemplateColumns: '28px 1fr 140px' }}>
+                <div key={g.id} className="rowlist-row" style={{ gridTemplateColumns: '28px minmax(150px, 1fr) 140px' }}>
                   <span>
                     <input
                       type="checkbox"
@@ -155,7 +155,7 @@ export default function R8FarmPage() {
                 </label>
               </div>
               <div className="rowlist" style={{ marginTop: 16 }}>
-                <div className="rowlist-head" style={{ gridTemplateColumns: '1fr 90px 100px 140px 110px' }}>
+                <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 90px 100px 140px 110px' }}>
                   <span>Айтем</span>
                   <span>Шанс</span>
                   <span>Потрібно</span>
@@ -163,7 +163,7 @@ export default function R8FarmPage() {
                   <span>Тижнів</span>
                 </div>
                 {farm.rows.map((r) => (
-                  <div key={r.lootItemId} className="rowlist-row" style={{ gridTemplateColumns: '1fr 90px 100px 140px 110px' }}>
+                  <div key={r.lootItemId} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 90px 100px 140px 110px' }}>
                     <span>{r.name}</span>
                     <span>{r.chancePct !== null ? `${r.chancePct}%` : '—'}</span>
                     <span>{r.needed}</span>
@@ -210,12 +210,12 @@ function LootTable({ items }: { items: LootItem[] }) {
   if (items.length === 0) return <p className="hint">Порожньо.</p>;
   return (
     <div className="rowlist" style={{ marginBottom: 8 }}>
-      <div className="rowlist-head" style={{ gridTemplateColumns: '1fr 120px' }}>
+      <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 120px' }}>
         <span>Назва</span>
         <span>Ціна</span>
       </div>
       {items.map((item) => (
-        <div key={item.id} className="rowlist-row" style={{ gridTemplateColumns: '1fr 120px' }}>
+        <div key={item.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 120px' }}>
           <span>{item.name}</span>
           <span style={{ fontWeight: 700 }} title={formatPriceExact(item.price)}>{formatPrice(item.price)}</span>
         </div>

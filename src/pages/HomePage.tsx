@@ -125,7 +125,7 @@ export default function HomePage() {
       {rows && rows.length > 0 && (
         <>
           <div className="rowlist" style={{ marginBottom: 8 }}>
-            <div className="rowlist-head" style={{ gridTemplateColumns: '1fr 110px 72px 72px 72px 72px' }}>
+            <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 110px 72px 72px 72px 72px' }}>
               <span>Шмотка</span>
               <span>Ціна</span>
               <span>1 перс</span>
@@ -137,7 +137,7 @@ export default function HomePage() {
               <div
                 key={r.id}
                 className="rowlist-row"
-                style={{ gridTemplateColumns: '1fr 110px 72px 72px 72px 72px', fontWeight: i === 0 ? 700 : 400 }}
+                style={{ gridTemplateColumns: 'minmax(150px, 1fr) 110px 72px 72px 72px 72px', fontWeight: i === 0 ? 700 : 400 }}
               >
                 <span>{r.name}</span>
                 <span title={formatPriceExact(r.price)}>{formatPrice(r.price)}</span>

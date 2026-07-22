@@ -157,13 +157,13 @@ function R8Manager() {
         <p className="hint">Шмоток ще немає.</p>
       ) : (
         <div className="rowlist">
-          <div className="rowlist-head" style={{ gridTemplateColumns: '1fr 140px 180px' }}>
+          <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 140px 180px' }}>
             <span>Назва</span>
             <span>Ціна</span>
             <span></span>
           </div>
           {gearItems.map((g) => (
-            <div key={g.id} className="rowlist-row" style={{ gridTemplateColumns: '1fr 140px 180px' }}>
+            <div key={g.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 140px 180px' }}>
               <span>{g.name}</span>
               <span style={{ fontWeight: 700 }} title={formatPriceExact(priceOf(g.id))}>{formatPrice(priceOf(g.id))}</span>
               <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>

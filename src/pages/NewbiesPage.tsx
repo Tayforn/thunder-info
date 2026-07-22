@@ -52,7 +52,7 @@ export default function NewbiesPage() {
 
       {rows && (
         <div className="rowlist">
-          <div className="rowlist-head" style={{ gridTemplateColumns: '1fr 160px 120px' }}>
+          <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 160px 120px' }}>
             <span>Нікнейм</span>
             <span>Клас</span>
             <span>Бали</span>
@@ -61,7 +61,7 @@ export default function NewbiesPage() {
             <p className="rowlist-empty hint">Новачків ще немає.</p>
           ) : (
             rows.map((r) => (
-              <div key={r.id} className="rowlist-row" style={{ gridTemplateColumns: '1fr 160px 120px' }}>
+              <div key={r.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 160px 120px' }}>
                 <span>{r.nickname}</span>
                 <span><ClassBadge cls={r.cls} /></span>
                 <span style={{ fontWeight: 700 }}>{r.totalPoints}</span>
