@@ -4,6 +4,8 @@
 
 import { routeUrl } from '../app/useRoute';
 
+const PW_CALC_URL = 'https://tayforn.github.io/pw.calc/craft/';
+
 interface Props {
   navOpen: boolean;
   onNavToggle: () => void;
@@ -39,6 +41,12 @@ export default function Header({ navOpen, onNavToggle }: Props) {
             <img src={import.meta.env.BASE_URL + 'assets/favicon-180.png'} alt="" width={180} height={180} />
           </span>
           <span className="logo-text">Thunder</span>
+        </a>
+        <a href={PW_CALC_URL} target="_blank" rel="noopener" className="helper-link" title="PW Helper — калькулятор крафту">
+          <span className="logo-crest" aria-hidden="true">
+            <img src={import.meta.env.BASE_URL + 'assets/pwcalc-icon.png'} alt="" width={180} height={180} />
+          </span>
+          <span className="helper-link-text">Хелпер</span>
         </a>
         <button
           type="button"

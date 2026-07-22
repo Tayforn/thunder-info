@@ -184,6 +184,29 @@ html.nav-open .nav-toggle-bars::after  { transform: translateY(-6px) rotate(-45d
   color: transparent;
 }
 
+.helper-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.helper-link:hover { color: var(--text); border-color: rgba(var(--accent-3-rgb), 0.5); }
+.helper-link .logo-crest img { border-radius: 6px; }
+@media (max-width: 520px) {
+  .helper-link-text { display: none; }
+  .helper-link { padding: 0 10px; gap: 0; }
+}
+
 .theme-toggle {
   display: inline-grid;
   place-items: center;
