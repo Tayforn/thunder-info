@@ -16,11 +16,14 @@ export type Route =
   | { name: 'home' }
   | { name: 'farm' }
   | { name: 'newbies' }
+  | { name: 'players' }
   | { name: 'activity' }
   | { name: 'r8' }
   | { name: 'admin' };
 
-const NAMES: Route['name'][] = ['home', 'farm', 'newbies', 'activity', 'r8', 'admin'];
+/** Єдине джерело списку маршрутів — використовується і тут (парсинг URL),
+ * і в Layout для делегованих [data-goto]-кліків. */
+export const ROUTE_NAMES: Route['name'][] = ['home', 'farm', 'newbies', 'players', 'activity', 'r8', 'admin'];
 
 function parsePath(): Route {
   let p = location.pathname;
@@ -28,7 +31,7 @@ function parsePath(): Route {
   const segs = p.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
   const [a] = segs;
   if (!a) return { name: 'home' };
-  const found = NAMES.find((n) => n === a);
+  const found = ROUTE_NAMES.find((n) => n === a);
   return found ? { name: found } : { name: 'home' };
 }
 

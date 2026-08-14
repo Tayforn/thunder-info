@@ -20,6 +20,27 @@ export interface Newbie {
   createdAt: string;
 }
 
+/** Гравець — як новачок, але з простішою системою балів: сума
+ * activity.points за відвідані активності (без множення на coef класу,
+ * без крон-снапшотів) + ручні премії (player_bonuses). */
+export interface Player {
+  id: string;
+  nickname: string;
+  classId: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** Ручна премія гравцю за конкретний день — одна на гравця на день,
+ * повторна видача перезаписує (upsert по unique(player_id, bonus_date)). */
+export interface PlayerBonus {
+  id: string;
+  playerId: string;
+  bonusDate: string;
+  points: number;
+  note: string | null;
+}
+
 export interface LootItem {
   id: string;
   name: string;

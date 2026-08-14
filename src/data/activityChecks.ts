@@ -42,6 +42,26 @@ export async function setCheck(activityId: string, newbieId: string, checked: bo
   }
 }
 
+/** Галочки одного новачка за діапазон дат (включно) — для read-only
+ * календаря відвідуваності на /newbies. Ключ мапи — YYYY-MM-DD, значення —
+ * set activity_id, відвіданих у той день. */
+export async function fetchNewbieChecksRange(newbieId: string, fromDate: string, toDate: string): Promise<Map<string, Set<string>>> {
+  const { data, error } = await supabase
+    .from('activity_checks')
+    .select('activity_id, check_date')
+    .eq('newbie_id', newbieId)
+    .gte('check_date', fromDate)
+    .lte('check_date', toDate);
+  if (error) throw error;
+  const byDate = new Map<string, Set<string>>();
+  for (const r of data as { activity_id: string; check_date: string }[]) {
+    const set = byDate.get(r.check_date) ?? new Set<string>();
+    set.add(r.activity_id);
+    byDate.set(r.check_date, set);
+  }
+  return byDate;
+}
+
 let subscriberSeq = 0;
 
 export function subscribeToActivityChecks(onChange: () => void): () => void {

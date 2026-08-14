@@ -1,6 +1,6 @@
 // =========================================================
-// /admin — 4 таби, кожен окрема "таблична" CRUD-панель (AdminTable):
-// Новачки, Ціна лута, Активності, Приоритетність класів.
+// /admin — 5 табів, кожен окрема "таблична" CRUD-панель (AdminTable):
+// Новачки, Гравці, Ціна лута, Активності, Приоритетність класів.
 // =========================================================
 
 import { useState } from 'react';
@@ -9,14 +9,16 @@ import { supabase } from '../app/supabaseClient';
 import { useAuth } from '../app/useAuth';
 import AdminGate from '../components/AdminGate';
 import NewbiesTab from './admin/NewbiesTab';
+import PlayersTab from './admin/PlayersTab';
 import LootPricesTab from './admin/LootPricesTab';
 import ActivitiesTab from './admin/ActivitiesTab';
 import ClassPriorityTab from './admin/ClassPriorityTab';
 
-type TabName = 'newbies' | 'loot' | 'activities' | 'classes';
+type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'classes';
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'newbies', label: 'Новачки' },
+  { name: 'players', label: 'Гравці' },
   { name: 'loot', label: 'Ціна лута' },
   { name: 'activities', label: 'Активності' },
   { name: 'classes', label: 'Приоритетність класів' },
@@ -42,6 +44,7 @@ function AdminTabs() {
         ))}
       </div>
       {tab === 'newbies' && <NewbiesTab />}
+      {tab === 'players' && <PlayersTab />}
       {tab === 'loot' && <LootPricesTab />}
       {tab === 'activities' && <ActivitiesTab />}
       {tab === 'classes' && <ClassPriorityTab />}

@@ -1,12 +1,13 @@
+// Той самий CRUD-патерн, що NewbiesTab, але для гравців (без балів) +
+// колонка нотатки.
 import { useEffect, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
 import { fetchClasses } from '../../data/classes';
-import { createNewbie, deleteNewbie, fetchNewbies, updateNewbie } from '../../data/newbies';
-import { promoteNewbieToPlayer } from '../../data/players';
-import type { ClassRow, Newbie } from '../../data/types';
+import { createPlayer, deletePlayer, fetchPlayers, updatePlayer } from '../../data/players';
+import type { ClassRow, Player } from '../../data/types';
 
-const COLUMNS = '1fr 200px 200px';
+const COLUMNS = '1fr 200px 1fr 90px';
 
 function ClassSelect({ classes, value, onChange }: { classes: ClassRow[]; value: string | null; onChange: (v: string | null) => void }) {
   return (
@@ -19,21 +20,22 @@ function ClassSelect({ classes, value, onChange }: { classes: ClassRow[]; value:
   );
 }
 
-function NicknameInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
+function TextCell({ initial, placeholder, onSave }: { initial: string; placeholder?: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   useEffect(() => setValue(initial), [initial]);
   return (
     <input
       type="text"
       value={value}
+      placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={() => value.trim() && value !== initial && onSave(value)}
+      onBlur={() => value !== initial && onSave(value)}
     />
   );
 }
 
-export default function NewbiesTab() {
-  const [newbies, setNewbies] = useState<Newbie[]>([]);
+export default function PlayersTab() {
+  const [players, setPlayers] = useState<Player[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [newNickname, setNewNickname] = useState('');
   const [newClassId, setNewClassId] = useState<string | null>(null);
@@ -41,8 +43,8 @@ export default function NewbiesTab() {
   const [err, setErr] = useState<string | null>(null);
 
   const reload = () =>
-    Promise.all([fetchNewbies(), fetchClasses()]).then(([n, c]) => {
-      setNewbies(n);
+    Promise.all([fetchPlayers(), fetchClasses()]).then(([p, c]) => {
+      setPlayers(p);
       setClasses(c);
     });
 
@@ -55,12 +57,12 @@ export default function NewbiesTab() {
     setBusy(true);
     setErr(null);
     try {
-      await createNewbie({ nickname: newNickname, classId: newClassId });
+      await createPlayer({ nickname: newNickname, classId: newClassId });
       setNewNickname('');
       setNewClassId(null);
       await reload();
     } catch (e) {
-      setErr(errorMessage(e, 'Не вдалося додати новачка.'));
+      setErr(errorMessage(e, 'Не вдалося додати гравця.'));
     } finally {
       setBusy(false);
     }
@@ -68,36 +70,25 @@ export default function NewbiesTab() {
 
   return (
     <div>
-      <h3>Новачки</h3>
+      <h3>Гравці</h3>
       <AdminTable
         columns={COLUMNS}
-        header={['Нікнейм', 'Клас', '']}
-        rows={newbies}
-        keyFn={(n) => n.id}
-        emptyLabel="Новачків ще немає."
-        renderRow={(n) => [
-          <NicknameInput key="nick" initial={n.nickname} onSave={(v) => updateNewbie(n.id, { nickname: v }).then(reload).catch(reportError)} />,
-          <ClassSelect key="cls" classes={classes} value={n.classId} onChange={(v) => updateNewbie(n.id, { classId: v }).then(reload).catch(reportError)} />,
-          <span key="actions" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              title="Перевести в гравці: історія відвідуваності збережеться, бали новачка (point_awards) зникнуть — у гравців бали рахуються інакше."
-              onClick={() =>
-                confirm(`Перевести «${n.nickname}» у гравці? Історія відвідуваності збережеться, бали новачка зникнуть.`) &&
-                promoteNewbieToPlayer(n).then(reload).catch(reportError)
-              }
-            >
-              У гравці
-            </button>
-            <button
-              type="button"
-              className="btn btn-bad btn-sm"
-              onClick={() => confirm(`Видалити новачка «${n.nickname}»?`) && deleteNewbie(n.id).then(reload).catch(reportError)}
-            >
-              Видалити
-            </button>
-          </span>,
+        header={['Нікнейм', 'Клас', 'Нотатка', '']}
+        rows={players}
+        keyFn={(p) => p.id}
+        emptyLabel="Гравців ще немає."
+        renderRow={(p) => [
+          <TextCell key="nick" initial={p.nickname} onSave={(v) => v.trim() && updatePlayer(p.id, { nickname: v }).then(reload).catch(reportError)} />,
+          <ClassSelect key="cls" classes={classes} value={p.classId} onChange={(v) => updatePlayer(p.id, { classId: v }).then(reload).catch(reportError)} />,
+          <TextCell key="note" initial={p.note ?? ''} placeholder="—" onSave={(v) => updatePlayer(p.id, { note: v || null }).then(reload).catch(reportError)} />,
+          <button
+            key="del"
+            type="button"
+            className="btn btn-bad btn-sm"
+            onClick={() => confirm(`Видалити гравця «${p.nickname}»? Історія відвідуваності теж зникне.`) && deletePlayer(p.id).then(reload).catch(reportError)}
+          >
+            Видалити
+          </button>,
         ]}
         addRow={
           <>

@@ -1,11 +1,11 @@
 // =========================================================
 // Каркас застосунку: шапка, сайдбар-drawer, одна активна сторінка.
-// 5 фіксованих сторінок (без динамічних сегментів) — рендеримо рівно
+// Фіксовані сторінки (без динамічних сегментів) — рендеримо рівно
 // одну сторінку за route.name.
 // =========================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRoute, type Route } from '../app/useRoute';
+import { useRoute, ROUTE_NAMES, type Route } from '../app/useRoute';
 import { useAuth } from '../app/useAuth';
 import Header from './Header';
 import Sidebar from './Sidebar';
@@ -14,12 +14,12 @@ import Footer from './Footer';
 import HomePage from '../pages/HomePage';
 import R8FarmPage from '../pages/R8FarmPage';
 import NewbiesPage from '../pages/NewbiesPage';
+import PlayersPage from '../pages/PlayersPage';
 import ActivityPage from '../pages/ActivityPage';
 import R8Page from '../pages/R8Page';
 import AdminPage from '../pages/AdminPage';
 
 const isMobile = () => window.matchMedia('(max-width: 880px)').matches;
-const NAV_NAMES = ['home', 'farm', 'newbies', 'activity', 'r8', 'admin'];
 
 export default function Layout() {
   const [route, navigate] = useRoute();
@@ -50,7 +50,7 @@ export default function Layout() {
     const onClick = (e: MouseEvent) => {
       const a = (e.target as HTMLElement).closest<HTMLElement>('[data-goto]');
       const name = a?.dataset.goto;
-      if (name && NAV_NAMES.includes(name)) {
+      if (name && (ROUTE_NAMES as string[]).includes(name)) {
         e.preventDefault();
         go({ name } as Route);
       }
@@ -67,6 +67,7 @@ export default function Layout() {
   if (route.name === 'home') page = <HomePage />;
   else if (route.name === 'farm') page = <R8FarmPage />;
   else if (route.name === 'newbies') page = <NewbiesPage />;
+  else if (route.name === 'players') page = <PlayersPage />;
   else if (route.name === 'activity') page = <ActivityPage />;
   else if (route.name === 'r8') page = <R8Page />;
   else if (route.name === 'admin') page = <AdminPage />;
