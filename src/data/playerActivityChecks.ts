@@ -1,12 +1,11 @@
 // =========================================================
 // Галочки відвідуваності гравців — та сама модель, що activityChecks.ts
 // у новачків (unique-рядок = галочка, toggle = insert/delete), але без
-// нарахування балів. Додатково до "сьогодні" (грід на /activity) є
-// вибірка за діапазон дат — для календаря відвідуваності на /players.
+// нарахування балів. Грід на /activity працює з довільною датою
+// (сьогодні й минулі дні), календар на /players — з діапазоном за місяць.
 // =========================================================
 
 import { supabase } from '../app/supabaseClient';
-import { kyivDateString } from './types';
 
 export interface PlayerActivityCheck {
   activityId: string;
@@ -15,21 +14,17 @@ export interface PlayerActivityCheck {
 
 interface PlayerCheckDbRow { activity_id: string; player_id: string; check_date: string }
 
-export async function fetchTodayPlayerChecks(): Promise<PlayerActivityCheck[]> {
+export async function fetchPlayerChecksOnDate(checkDate: string): Promise<PlayerActivityCheck[]> {
   const { data, error } = await supabase
     .from('player_activity_checks')
     .select('activity_id, player_id')
-    .eq('check_date', kyivDateString());
+    .eq('check_date', checkDate);
   if (error) throw error;
   return (data as PlayerCheckDbRow[]).map((r) => ({ activityId: r.activity_id, playerId: r.player_id }));
 }
 
-export async function setPlayerCheck(activityId: string, playerId: string, checked: boolean, checkedBy: string | undefined): Promise<void> {
-  return setPlayerCheckOnDate(activityId, playerId, kyivDateString(), checked, checkedBy);
-}
-
-/** Toggle галочки за довільний день — для ретро-редагування з календаря
- * на /players (сьогоднішній грід на /activity користується setPlayerCheck). */
+/** Toggle галочки за довільний день — грід на /activity (з навігацією по
+ * датах) і ретро-редагування з календаря на /players. */
 export async function setPlayerCheckOnDate(activityId: string, playerId: string, checkDate: string, checked: boolean, checkedBy: string | undefined): Promise<void> {
   if (checked) {
     const { error } = await supabase
