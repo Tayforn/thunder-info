@@ -24,8 +24,29 @@ const TABS: { name: TabName; label: string }[] = [
   { name: 'classes', label: 'Приоритетність класів' },
 ];
 
+// Активний таб переживає ремаунт і релоад (повернення фокусу вкладці,
+// F5) — ключ у localStorage, той самий підхід, що thunder-theme у Header.
+const TAB_STORAGE_KEY = 'thunder-admin-tab';
+
 function AdminTabs() {
-  const [tab, setTab] = useState<TabName>('newbies');
+  const [tab, setTab] = useState<TabName>(() => {
+    try {
+      const saved = localStorage.getItem(TAB_STORAGE_KEY);
+      if (TABS.some((t) => t.name === saved)) return saved as TabName;
+    } catch {
+      /* ignore */
+    }
+    return 'newbies';
+  });
+
+  const selectTab = (t: TabName) => {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, t);
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <div>
@@ -37,7 +58,7 @@ function AdminTabs() {
             role="tab"
             aria-selected={tab === t.name}
             className={'btn btn-sm ' + (tab === t.name ? 'btn-primary' : 'btn-ghost')}
-            onClick={() => setTab(t.name)}
+            onClick={() => selectTab(t.name)}
           >
             {t.label}
           </button>
