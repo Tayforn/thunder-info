@@ -611,3 +611,35 @@ body.modal-open { overflow: hidden; }
 
 /* Клікабельний рядок ростера гравців */
 .rowlist-row-click.selected { background: rgba(216, 31, 31, 0.08); }
+
+/* =========================================================
+   НАВІГАЦІЯ ПО ДАТАХ (/activity, секція "Гравці") — компактний
+   input[type=date] у стилі решти інпутів (.field), бо він живе поза
+   .field/.rowlist-row і інакше лишається нативним/білим.
+   ========================================================= */
+.date-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.date-nav input[type='date'] {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line-2);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  color-scheme: dark;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.date-nav input[type='date']:focus {
+  outline: none;
+  border-color: var(--accent);
+  background-color: rgba(var(--accent-3-rgb), 0.06);
+  box-shadow: 0 0 0 4px rgba(var(--accent-3-rgb), 0.15);
+}
+.date-nav input[type='date']::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.7; }
+.date-nav input[type='date']::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+html[data-theme='light'] .date-nav input[type='date'] {
+  background-color: rgba(122, 15, 15, 0.04);
+  color-scheme: light;
+}

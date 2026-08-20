@@ -253,7 +253,7 @@ function PlayersSection({ session, players, activities, classById }: {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div className="date-nav">
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => shiftDay(-1)}>←</button>
         <input type="date" value={date} max={today} onChange={(e) => e.target.value && e.target.value <= today && setDate(e.target.value)} />
         <button type="button" className="btn btn-ghost btn-sm" disabled={date >= today} onClick={() => shiftDay(1)}>→</button>
