@@ -13,12 +13,13 @@ interface HasClass {
   nickname: string;
 }
 
+/** Позиція класу людини в порядку "Приоритетності класів"; без класу — в кінець. */
+export function classOrder(p: HasClass, classById: Map<string, ClassRow>): number {
+  return (p.classId ? classById.get(p.classId)?.sortOrder : undefined) ?? Number.MAX_SAFE_INTEGER;
+}
+
 export function sortByClass<T extends HasClass>(people: T[], classById: Map<string, ClassRow>): T[] {
-  return people.slice().sort((a, b) => {
-    const ca = (a.classId ? classById.get(a.classId)?.sortOrder : undefined) ?? Number.MAX_SAFE_INTEGER;
-    const cb = (b.classId ? classById.get(b.classId)?.sortOrder : undefined) ?? Number.MAX_SAFE_INTEGER;
-    return ca - cb || a.nickname.localeCompare(b.nickname);
-  });
+  return people.slice().sort((a, b) => classOrder(a, classById) - classOrder(b, classById) || a.nickname.localeCompare(b.nickname));
 }
 
 export interface ClassFilterState {

@@ -10,8 +10,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import ClassBadge from '../components/ClassBadge';
-import { ClassFilterChips, sortByClass, useClassFilter } from '../components/ClassFilter';
+import { ClassFilterChips, classOrder, sortByClass, useClassFilter } from '../components/ClassFilter';
 import AttendanceCalendar, { MONTH_NOM, dateKey } from '../components/AttendanceCalendar';
+import { SortHeader, useColumnSort } from '../app/useColumnSort';
 import { useAuth } from '../app/useAuth';
 import { fetchClasses } from '../data/classes';
 import { fetchActivities } from '../data/activities';
@@ -105,9 +106,21 @@ export default function PlayersPage() {
 
   const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
   const classFilter = useClassFilter(players ?? [], classById);
-  // Групування за класом, як на /activity (раніше було за балами — але
-  // бали видно лише адмінам, а порядок має бути однаковий для всіх).
-  const visible = classFilter.visible(sortByClass(players ?? [], classById));
+  const { sort, toggle: toggleSort } = useColumnSort();
+
+  // Дефолтний порядок — групування за класом, як на /activity (бали видно
+  // лише адмінам, тож публічний порядок від них не залежить); клік по
+  // заголовку колонки тимчасово пересортовує (three-state, див. useColumnSort).
+  let list = sortByClass(players ?? [], classById);
+  if (sort) {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    list = list.slice().sort((a, b) => {
+      if (sort.col === 'points') return mul * ((totals.get(a.id) ?? 0) - (totals.get(b.id) ?? 0)) || a.nickname.localeCompare(b.nickname);
+      if (sort.col === 'class') return mul * (classOrder(a, classById) - classOrder(b, classById)) || a.nickname.localeCompare(b.nickname);
+      return mul * a.nickname.localeCompare(b.nickname);
+    });
+  }
+  const visible = classFilter.visible(list);
   const selected = selectedId ? players?.find((p) => p.id === selectedId) ?? null : null;
 
   const stepMonth = (dir: 1 | -1) =>
@@ -146,9 +159,9 @@ export default function PlayersPage() {
       {players && (
         <div className="rowlist">
           <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
-            <span>Нікнейм</span>
-            <span>Клас</span>
-            {isAdmin && <span>Бали</span>}
+            <span><SortHeader label="Нікнейм" col="nickname" sort={sort} onToggle={toggleSort} /></span>
+            <span><SortHeader label="Клас" col="class" sort={sort} onToggle={toggleSort} /></span>
+            {isAdmin && <span><SortHeader label="Бали" col="points" sort={sort} onToggle={toggleSort} firstDir="desc" /></span>}
           </div>
           {players.length === 0 ? (
             <p className="rowlist-empty hint">Гравців ще немає.</p>

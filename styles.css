@@ -612,6 +612,24 @@ body.modal-open { overflow: hidden; }
 /* Клікабельний рядок ростера гравців */
 .rowlist-row-click.selected { background: rgba(216, 31, 31, 0.08); }
 
+/* Клікабельний заголовок колонки (three-state сортування) — успадковує
+   вигляд .rowlist-head, лише додає курсор і стрілку напряму. */
+.sort-header {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sort-header:hover { color: var(--accent-3); }
+.sort-header-arrow { font-size: 10px; min-width: 10px; }
+
 /* =========================================================
    НАВІГАЦІЯ ПО ДАТАХ (/activity, секція "Гравці") — компактний
    input[type=date] у стилі решти інпутів (.field), бо він живе поза

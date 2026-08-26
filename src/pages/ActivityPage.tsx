@@ -20,7 +20,8 @@ import { reportError } from '../app/errorMessage';
 import AdminGate from '../components/AdminGate';
 import { dateKey } from '../components/AttendanceCalendar';
 import ClassBadge from '../components/ClassBadge';
-import { ClassFilterChips, sortByClass, useClassFilter } from '../components/ClassFilter';
+import { ClassFilterChips, classOrder, sortByClass, useClassFilter } from '../components/ClassFilter';
+import { SortHeader, useColumnSort } from '../app/useColumnSort';
 import { fetchActivities } from '../data/activities';
 import { fetchTodayChecks, setCheck, subscribeToActivityChecks } from '../data/activityChecks';
 import { fetchPlayerChecksOnDate, setPlayerCheckOnDate, subscribeToPlayerActivityChecks } from '../data/playerActivityChecks';
@@ -37,12 +38,15 @@ interface GridPerson {
   classId: string | null;
 }
 
-/** Спільний грід "людина × активності дня" для обох секцій.
- * Оптимістичний toggle і відкат при помилці. extra — додаткова колонка
- * справа (премія у гравців). */
+/** Спільний грід "людина × активності дня" для обох секцій; клас — окрема
+ * колонка. Оптимістичний toggle і відкат при помилці. extra — додаткова
+ * колонка справа (премія у гравців); personHeader/classHeader — заміна
+ * текстових заголовків (сортувальні кнопки в секції гравців). */
 function ChecksGrid({
   people,
   personLabel,
+  personHeader,
+  classHeader,
   activities,
   checked,
   setChecked,
@@ -53,6 +57,8 @@ function ChecksGrid({
 }: {
   people: GridPerson[];
   personLabel: string;
+  personHeader?: React.ReactNode;
+  classHeader?: React.ReactNode;
   activities: Activity[];
   checked: Set<string>; // `${activityId}:${personId}`
   setChecked: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -86,14 +92,15 @@ function ChecksGrid({
 
   if (people.length === 0) return <p className="hint">{emptyLabel}</p>;
 
-  const columns = ['220px', ...activities.map(() => '130px'), ...(extra ? ['130px'] : [])].join(' ');
-  const minWidth = 360 + (activities.length + (extra ? 1 : 0)) * 130;
+  const columns = ['190px', '110px', ...activities.map(() => '130px'), ...(extra ? ['130px'] : [])].join(' ');
+  const minWidth = 350 + (activities.length + (extra ? 1 : 0)) * 130;
 
   return (
     <div style={{ overflowX: 'auto' }}>
       <div className="rowlist" style={{ minWidth }}>
         <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
-          <span>{personLabel}</span>
+          <span>{personHeader ?? personLabel}</span>
+          <span>{classHeader ?? 'Клас'}</span>
           {activities.map((a) => (
             <span key={a.id} title={`${a.points} балів`}>{a.name} · {a.points}</span>
           ))}
@@ -101,9 +108,8 @@ function ChecksGrid({
         </div>
         {people.map((p) => (
           <div key={p.id} className="rowlist-row" style={{ gridTemplateColumns: columns }}>
-            <span>
-              {p.nickname} <ClassBadge cls={p.classId ? classById.get(p.classId) ?? null : null} />
-            </span>
+            <span>{p.nickname}</span>
+            <span><ClassBadge cls={p.classId ? classById.get(p.classId) ?? null : null} /></span>
             {activities.map((a) => (
               <span key={a.id}>
                 <input
@@ -210,6 +216,7 @@ function PlayersSection({ session, players, activities, classById }: {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [bonuses, setBonuses] = useState<Map<string, PlayerBonus>>(new Map());
   const classFilter = useClassFilter(players, classById);
+  const { sort, toggle: toggleSort } = useColumnSort();
 
   const reload = useCallback(
     () =>
@@ -233,7 +240,16 @@ function PlayersSection({ session, players, activities, classById }: {
   }, [reload]);
 
   // Без useMemo: список гільдійного розміру, сортування на рендер дешеве.
-  const visiblePlayers = classFilter.visible(sortByClass(players, classById));
+  // Дефолт — групування за класом; клік по заголовку — three-state.
+  let list = sortByClass(players, classById);
+  if (sort) {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    list = list.slice().sort((a, b) => {
+      if (sort.col === 'class') return mul * (classOrder(a, classById) - classOrder(b, classById)) || a.nickname.localeCompare(b.nickname);
+      return mul * a.nickname.localeCompare(b.nickname);
+    });
+  }
+  const visiblePlayers = classFilter.visible(list);
 
   const dow = new Date(date + 'T12:00:00').getDay();
   // Активності вибраного дня: заплановані за weekdays + ті, де вже є
@@ -276,6 +292,8 @@ function PlayersSection({ session, players, activities, classById }: {
         <ChecksGrid
           people={visiblePlayers}
           personLabel="Гравець"
+          personHeader={<SortHeader label="Гравець" col="nickname" sort={sort} onToggle={toggleSort} />}
+          classHeader={<SortHeader label="Клас" col="class" sort={sort} onToggle={toggleSort} />}
           activities={dayActivities}
           checked={checked}
           setChecked={setChecked}
