@@ -208,6 +208,8 @@ function PlayersSection({ session, players, activities, classById }: {
   const [date, setDate] = useState(today);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [bonuses, setBonuses] = useState<Map<string, PlayerBonus>>(new Map());
+  // Фільтр по класах: set class_id ('none' = без класу); порожній = усі.
+  const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
 
   const reload = useCallback(
     () =>
@@ -242,6 +244,30 @@ function PlayersSection({ session, players, activities, classById }: {
     [players, classById],
   );
 
+  // Чіпи фільтра — лише класи, в яких є гравці, + "Без класу" за потреби.
+  const filterChips = useMemo(() => {
+    const usedClassIds = new Set(players.map((p) => p.classId).filter((id): id is string => !!id));
+    const chips = Array.from(usedClassIds, (id) => classById.get(id))
+      .filter((c): c is ClassRow => !!c)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => ({ key: c.id, label: c.name }));
+    if (players.some((p) => !p.classId)) chips.push({ key: 'none', label: 'Без класу' });
+    return chips;
+  }, [players, classById]);
+
+  const toggleClassFilter = (key: string) =>
+    setClassFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const visiblePlayers = useMemo(
+    () => (classFilter.size === 0 ? sortedPlayers : sortedPlayers.filter((p) => classFilter.has(p.classId ?? 'none'))),
+    [sortedPlayers, classFilter],
+  );
+
   const dow = new Date(date + 'T12:00:00').getDay();
   // Активності вибраного дня: заплановані за weekdays + ті, де вже є
   // галочки (розклад могли змінити — інакше стару галочку не зняти звідси).
@@ -274,11 +300,34 @@ function PlayersSection({ session, players, activities, classById }: {
         )}
         <span className="hint">{WEEKDAY_LABELS_FULL[dow]} — можна масово відмічати й минулі дні.</span>
       </div>
+      {filterChips.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }} role="group" aria-label="Фільтр по класах">
+          <button
+            type="button"
+            className={'btn btn-sm ' + (classFilter.size === 0 ? 'btn-primary' : 'btn-ghost')}
+            onClick={() => setClassFilter(new Set())}
+          >
+            Всі
+          </button>
+          {filterChips.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              className={'btn btn-sm ' + (classFilter.has(c.key) ? 'btn-primary' : 'btn-ghost')}
+              onClick={() => toggleClassFilter(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
       {dayActivities.length === 0 ? (
         <p className="hint">У цей день активностей не заплановано.</p>
+      ) : visiblePlayers.length === 0 ? (
+        <p className="hint">Під вибраний фільтр не потрапив жоден гравець.</p>
       ) : (
         <ChecksGrid
-          people={sortedPlayers}
+          people={visiblePlayers}
           personLabel="Гравець"
           activities={dayActivities}
           checked={checked}
