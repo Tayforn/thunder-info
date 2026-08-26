@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import ClassBadge from '../components/ClassBadge';
+import { ClassFilterChips, sortByClass, useClassFilter } from '../components/ClassFilter';
 import AttendanceCalendar, { MONTH_NOM, dateKey } from '../components/AttendanceCalendar';
 import { useAuth } from '../app/useAuth';
 import { fetchClasses } from '../data/classes';
@@ -103,10 +104,10 @@ export default function PlayersPage() {
   }, [selectedId, loadMonth, reloadTotals]);
 
   const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
-  const sorted = useMemo(
-    () => (players ?? []).slice().sort((a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0) || a.nickname.localeCompare(b.nickname)),
-    [players, totals],
-  );
+  const classFilter = useClassFilter(players ?? [], classById);
+  // Групування за класом, як на /activity (раніше було за балами — але
+  // бали видно лише адмінам, а порядок має бути однаковий для всіх).
+  const visible = classFilter.visible(sortByClass(players ?? [], classById));
   const selected = selectedId ? players?.find((p) => p.id === selectedId) ?? null : null;
 
   const stepMonth = (dir: 1 | -1) =>
@@ -140,6 +141,8 @@ export default function PlayersPage() {
         </label>
       )}
 
+      {players && <ClassFilterChips filter={classFilter} />}
+
       {players && (
         <div className="rowlist">
           <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
@@ -147,10 +150,12 @@ export default function PlayersPage() {
             <span>Клас</span>
             {isAdmin && <span>Бали</span>}
           </div>
-          {sorted.length === 0 ? (
+          {players.length === 0 ? (
             <p className="rowlist-empty hint">Гравців ще немає.</p>
+          ) : visible.length === 0 ? (
+            <p className="rowlist-empty hint">Під вибраний фільтр не потрапив жоден гравець.</p>
           ) : (
-            sorted.map((p) => (
+            visible.map((p) => (
               <div
                 key={p.id}
                 className={'rowlist-row rowlist-row-click' + (p.id === selectedId ? ' selected' : '')}
