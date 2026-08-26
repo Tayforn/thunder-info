@@ -230,6 +230,18 @@ function PlayersSection({ session, players, activities, classById }: {
     };
   }, [reload]);
 
+  // Групування рядків за класом (порядок — sort_order з "Приоритетності
+  // класів", без класу — в кінець), всередині класу — за ніком.
+  const sortedPlayers = useMemo(
+    () =>
+      players.slice().sort((a, b) => {
+        const ca = (a.classId ? classById.get(a.classId)?.sortOrder : undefined) ?? Number.MAX_SAFE_INTEGER;
+        const cb = (b.classId ? classById.get(b.classId)?.sortOrder : undefined) ?? Number.MAX_SAFE_INTEGER;
+        return ca - cb || a.nickname.localeCompare(b.nickname);
+      }),
+    [players, classById],
+  );
+
   const dow = new Date(date + 'T12:00:00').getDay();
   // Активності вибраного дня: заплановані за weekdays + ті, де вже є
   // галочки (розклад могли змінити — інакше стару галочку не зняти звідси).
@@ -266,7 +278,7 @@ function PlayersSection({ session, players, activities, classById }: {
         <p className="hint">У цей день активностей не заплановано.</p>
       ) : (
         <ChecksGrid
-          people={players}
+          people={sortedPlayers}
           personLabel="Гравець"
           activities={dayActivities}
           checked={checked}
