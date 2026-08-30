@@ -129,7 +129,7 @@ export default function NewbiesPage() {
           {!checksByDate ? (
             <p className="hint">Завантаження…</p>
           ) : (
-            <AttendanceCalendar year={anchor.y} month={anchor.m} activities={activities} checksByDate={checksByDate} admin={false} />
+            <AttendanceCalendar year={anchor.y} month={anchor.m} activities={activities} checksByDate={checksByDate} showPoints={false} />
           )}
         </div>
       )}

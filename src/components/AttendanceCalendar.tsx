@@ -47,8 +47,11 @@ interface Props {
   /** YYYY-MM-DD → премія за день (fetchPlayerBonusesRange); не передана =
    * премій у цієї сутності немає (новачки). */
   bonusByDate?: Map<string, PlayerBonus>;
-  /** Адмін бачить бали й редактор премій; публічно — лише ✓/✗. */
-  admin: boolean;
+  /** Показувати бали (підсумок місяця, бали активностей у деталях дня).
+   * Права на редагування задаються НЕ цим прапорцем, а наявністю
+   * onSaveBonus/onDeleteBonus/onToggleCheck — сторінка передає їх лише
+   * адмінам. */
+  showPoints: boolean;
   onSaveBonus?: (dateKey: string, points: number, note: string) => Promise<void>;
   onDeleteBonus?: (dateKey: string) => Promise<void>;
   /** Ретро-редагування: клік по активності в деталях дня ставить/знімає
@@ -112,7 +115,7 @@ function BonusEditor({
 
 const NO_BONUSES = new Map<string, PlayerBonus>();
 
-export default function AttendanceCalendar({ year, month, activities, checksByDate, bonusByDate = NO_BONUSES, admin, onSaveBonus, onDeleteBonus, onToggleCheck }: Props) {
+export default function AttendanceCalendar({ year, month, activities, checksByDate, bonusByDate = NO_BONUSES, showPoints, onSaveBonus, onDeleteBonus, onToggleCheck }: Props) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [toggleBusy, setToggleBusy] = useState(false);
   const today = kyivDateString();
@@ -191,8 +194,8 @@ export default function AttendanceCalendar({ year, month, activities, checksByDa
 
       <p className="hint" style={{ marginTop: 10 }}>
         За місяць відвідано <b>{totals.attended}</b> з <b>{totals.total}</b> активностей
-        {admin && <> · балів: <b>{totals.points + totals.bonus}</b>{totals.bonus > 0 && <> (з них премій: {totals.bonus})</>}</>}.
-        Клікни на день, щоб побачити деталі{admin && onSaveBonus ? ' або видати премію' : ''}.
+        {showPoints && <> · балів: <b>{totals.points + totals.bonus}</b>{totals.bonus > 0 && <> (з них премій: {totals.bonus})</>}</>}.
+        Клікни на день, щоб побачити деталі{onSaveBonus ? ' або видати премію' : ''}.
       </p>
 
       {selected && (
@@ -208,7 +211,7 @@ export default function AttendanceCalendar({ year, month, activities, checksByDa
                 const label = (
                   <>
                     {attended ? '✓' : '✗'} {activity.name}
-                    {admin && attended && activity.points > 0 && <> · {activity.points}</>}
+                    {showPoints && attended && activity.points > 0 && <> · {activity.points}</>}
                   </>
                 );
                 return onToggleCheck ? (
@@ -239,7 +242,7 @@ export default function AttendanceCalendar({ year, month, activities, checksByDa
               ★ Премія: {selected.bonus.points}{selected.bonus.note ? ` — ${selected.bonus.note}` : ''}
             </p>
           )}
-          {admin && selected.state !== 'future' && onSaveBonus && onDeleteBonus && (
+          {selected.state !== 'future' && onSaveBonus && onDeleteBonus && (
             <BonusEditor
               key={selected.key}
               bonus={selected.bonus}

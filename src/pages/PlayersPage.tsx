@@ -1,10 +1,10 @@
 // =========================================================
 // Публічна сторінка "Гравці" — ростер гільдії. Бали гравця = сума
-// activity.points за відвідані активності + премії; колонку балів, як і
-// на /newbies, бачать лише адміни (з фільтром за період). Клік на гравця
+// activity.points за відвідані активності + премії; бали, фільтр за
+// період і календар видно всім (на відміну від /newbies). Клік на гравця
 // відкриває місячний календар відвідуваності (галочки з /activity,
-// player_activity_checks); адмін звідти ж видає премії і ретро-виправляє
-// галочки минулих днів. Редагування списку гравців — у /admin.
+// player_activity_checks); редагування — лише адмінам: премії і
+// ретро-галочки в календарі, список гравців — у /admin.
 // =========================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -53,7 +53,7 @@ export default function PlayersPage() {
   });
   const [monthData, setMonthData] = useState<{ checks: Map<string, Set<string>>; bonuses: Map<string, PlayerBonus> } | null>(null);
 
-  const columns = isAdmin ? 'minmax(150px, 1fr) 160px 120px' : 'minmax(150px, 1fr) 160px';
+  const columns = 'minmax(150px, 1fr) 160px 120px';
 
   const reloadTotals = useCallback(
     () => fetchPlayerTotals(periodRange(period)).then((t) => setTotals(new Map(t.map((x) => [x.playerId, x.totalPoints])))),
@@ -143,7 +143,7 @@ export default function PlayersPage() {
       {err && <p className="form-err">{err}</p>}
       {!players && !err && <p className="hint">Завантаження…</p>}
 
-      {isAdmin && players && (
+      {players && (
         <label className="field" style={{ maxWidth: 220, marginBottom: 12 }}>
           <span>Бали за період</span>
           <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
@@ -161,7 +161,7 @@ export default function PlayersPage() {
           <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
             <span><SortHeader label="Нікнейм" col="nickname" sort={sort} onToggle={toggleSort} /></span>
             <span><SortHeader label="Клас" col="class" sort={sort} onToggle={toggleSort} /></span>
-            {isAdmin && <span><SortHeader label="Бали" col="points" sort={sort} onToggle={toggleSort} firstDir="desc" /></span>}
+            <span><SortHeader label="Бали" col="points" sort={sort} onToggle={toggleSort} firstDir="desc" /></span>
           </div>
           {players.length === 0 ? (
             <p className="rowlist-empty hint">Гравців ще немає.</p>
@@ -180,7 +180,7 @@ export default function PlayersPage() {
                   {p.note && <small className="hint">{p.note}</small>}
                 </span>
                 <span><ClassBadge cls={p.classId ? classById.get(p.classId) ?? null : null} /></span>
-                {isAdmin && <span style={{ fontWeight: 700 }}>{totals.get(p.id) ?? 0}</span>}
+                <span style={{ fontWeight: 700 }}>{totals.get(p.id) ?? 0}</span>
               </div>
             ))
           )}
@@ -206,9 +206,11 @@ export default function PlayersPage() {
               activities={activities}
               checksByDate={monthData.checks}
               bonusByDate={monthData.bonuses}
-              admin={isAdmin}
-              onSaveBonus={(d, points, note) => setPlayerBonus(selected.id, d, points, note, session?.user.id).then(afterCalendarChange)}
-              onDeleteBonus={(d) => deletePlayerBonus(selected.id, d).then(afterCalendarChange)}
+              showPoints
+              onSaveBonus={
+                isAdmin ? (d, points, note) => setPlayerBonus(selected.id, d, points, note, session?.user.id).then(afterCalendarChange) : undefined
+              }
+              onDeleteBonus={isAdmin ? (d) => deletePlayerBonus(selected.id, d).then(afterCalendarChange) : undefined}
               onToggleCheck={
                 isAdmin
                   ? (d, activityId, next) => setPlayerCheckOnDate(activityId, selected.id, d, next, session?.user.id).then(afterCalendarChange)
