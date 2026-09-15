@@ -1,6 +1,7 @@
 // =========================================================
-// /admin — 5 табів, кожен окрема "таблична" CRUD-панель (AdminTable):
-// Новачки, Гравці, Ціна лута, Активності, Приоритетність класів.
+// /admin — 6 табів: п'ять "табличних" CRUD-панелей (AdminTable) —
+// Новачки, Гравці, Ціна лута, Активності, Приоритетність класів — і
+// «Доступ»: хто входив через Discord, з баном/розбаном.
 // =========================================================
 
 import { useState } from 'react';
@@ -13,8 +14,9 @@ import PlayersTab from './admin/PlayersTab';
 import LootPricesTab from './admin/LootPricesTab';
 import ActivitiesTab from './admin/ActivitiesTab';
 import ClassPriorityTab from './admin/ClassPriorityTab';
+import AccessTab from './admin/AccessTab';
 
-type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'classes';
+type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'classes' | 'access';
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'newbies', label: 'Новачки' },
@@ -22,6 +24,7 @@ const TABS: { name: TabName; label: string }[] = [
   { name: 'loot', label: 'Ціна лута' },
   { name: 'activities', label: 'Активності' },
   { name: 'classes', label: 'Приоритетність класів' },
+  { name: 'access', label: 'Доступ' },
 ];
 
 // Активний таб переживає ремаунт і релоад (повернення фокусу вкладці,
@@ -69,6 +72,7 @@ function AdminTabs() {
       {tab === 'loot' && <LootPricesTab />}
       {tab === 'activities' && <ActivitiesTab />}
       {tab === 'classes' && <ClassPriorityTab />}
+      {tab === 'access' && <AccessTab />}
     </div>
   );
 }
