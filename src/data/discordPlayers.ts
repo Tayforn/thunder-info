@@ -15,7 +15,6 @@ export interface DiscordPlayer {
   nickname: string;
   avatarUrl: string | null;
   banned: boolean;
-  runsCount: number;
   lastLoginAt: string | null;
   createdAt: string | null;
 }
@@ -25,7 +24,6 @@ interface Row {
   nickname: string;
   avatar_url: string | null;
   banned: boolean;
-  runs_count: number;
   last_login_at: string | null;
   created_at: string | null;
 }
@@ -33,7 +31,7 @@ interface Row {
 export async function fetchDiscordPlayers(): Promise<DiscordPlayer[]> {
   const { data, error } = await supabase
     .from('ladder_players')
-    .select('id, nickname, avatar_url, banned, runs_count, last_login_at, created_at')
+    .select('id, nickname, avatar_url, banned, last_login_at, created_at')
     .order('last_login_at', { ascending: false });
   if (error) throw error;
   return (data as Row[] | null ?? []).map((r) => ({
@@ -41,7 +39,6 @@ export async function fetchDiscordPlayers(): Promise<DiscordPlayer[]> {
     nickname: r.nickname,
     avatarUrl: r.avatar_url,
     banned: r.banned,
-    runsCount: r.runs_count ?? 0,
     lastLoginAt: r.last_login_at,
     createdAt: r.created_at,
   }));

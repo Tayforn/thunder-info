@@ -76,14 +76,13 @@ export default function AccessTab() {
         <p className="hint">Завантаження…</p>
       ) : (
         <AdminTable
-          columns="2fr 1fr 1.6fr 1.1fr auto"
-          header={['Нік', 'Забігів', 'Останній вхід', 'Статус', '']}
+          columns="2fr 1.6fr 1.1fr auto"
+          header={['Нік', 'Останній вхід', 'Статус', '']}
           rows={shown}
           keyFn={(p) => p.id}
           emptyLabel={players.length === 0 ? 'Ще ніхто не входив через Discord.' : 'Нікого не знайдено.'}
           renderRow={(p) => [
             <b>{p.nickname}</b>,
-            p.runsCount,
             when(p.lastLoginAt),
             p.banned ? <span className="badge bad">Забанений</span> : <span className="badge good">Доступ є</span>,
             <button
