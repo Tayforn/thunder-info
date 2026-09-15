@@ -7,6 +7,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRoute, ROUTE_NAMES, type Route } from '../app/useRoute';
 import { useAuth } from '../app/useAuth';
+import { useMe } from '../app/useMe';
+import { ROUTE_ACCESS } from '../app/access';
+import { setDirectReads } from '../app/supabaseClient';
+import MemberNotice from './MemberNotice';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
@@ -23,7 +27,14 @@ const isMobile = () => window.matchMedia('(max-width: 880px)').matches;
 
 export default function Layout() {
   const [route, navigate] = useRoute();
-  const { isAdmin } = useAuth();
+  const { session, isAdmin, loading: adminLoading } = useAuth();
+  const { me, loading: meLoading, login, logout } = useMe();
+  const viewer = { member: !!me, admin: isAdmin };
+
+  // Адмін має сесію Supabase — читає дані напряму, Discord йому не потрібен.
+  useEffect(() => {
+    setDirectReads(!!session);
+  }, [session]);
   const [navOpen, setNavOpen] = useState(() => document.documentElement.classList.contains('nav-open'));
 
   const setOpen = useCallback((on: boolean) => {
@@ -72,12 +83,28 @@ export default function Layout() {
   else if (route.name === 'r8') page = <R8Page />;
   else if (route.name === 'admin') page = <AdminPage />;
 
+  // Розділи для учасників клану: поки авторизація перевіряється — нічого не
+  // вантажимо (запити однаково впертись би в 401), далі або сторінка, або
+  // запрошення увійти. Адмінські розділи мають власний AdminGate із формою
+  // входу, тож їх не перехоплюємо.
+  if (ROUTE_ACCESS[route.name] === 'member' && !viewer.member && !viewer.admin) {
+    page = adminLoading || meLoading
+      ? <p className="hint" style={{ padding: 24 }}>Перевірка доступу…</p>
+      : <MemberNotice onLogin={login} />;
+  }
+
   return (
     <>
-      <Header navOpen={navOpen} onNavToggle={() => setOpen(!document.documentElement.classList.contains('nav-open'))} />
+      <Header
+        navOpen={navOpen}
+        onNavToggle={() => setOpen(!document.documentElement.classList.contains('nav-open'))}
+        me={me}
+        onLogin={login}
+        onLogout={logout}
+      />
       <div className="nav-backdrop" aria-hidden="true" onClick={() => setOpen(false)}></div>
       <div className="app-shell container">
-        <Sidebar route={route} isAdmin={isAdmin} onNavigate={go} />
+        <Sidebar route={route} viewer={viewer} onNavigate={go} />
         <div className="content">
           <main>{page}</main>
         </div>

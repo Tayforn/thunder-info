@@ -7,6 +7,10 @@ import { routeUrl } from '../app/useRoute';
 interface Props {
   navOpen: boolean;
   onNavToggle: () => void;
+  /** Discord-сесія (спільна на піддомени) — показуємо нік і вихід. */
+  me?: { nickname: string } | null;
+  onLogin?: () => void;
+  onLogout?: () => void;
 }
 
 function toggleTheme(): void {
@@ -19,7 +23,7 @@ function toggleTheme(): void {
   }
 }
 
-export default function Header({ navOpen, onNavToggle }: Props) {
+export default function Header({ navOpen, onNavToggle, me, onLogin, onLogout }: Props) {
   return (
     <header className="site-header">
       <div className="container header-inner">
@@ -43,6 +47,15 @@ export default function Header({ navOpen, onNavToggle }: Props) {
         <a href="https://ladder.thunderpw.fun/" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} title="Ладдер страждання">Ладдер</a>
         <a href="https://calc.thunderpw.fun/" className="btn btn-ghost btn-sm" title="PW Хелпер — калькулятори">Хелпер</a>
         <a href="https://pvp.thunderpw.fun/" className="btn btn-ghost btn-sm" title="PvP — турніри сервера">PvP</a>
+        {onLogin && (me ? (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onLogout} title="Вийти з Discord">
+            {me.nickname} ✕
+          </button>
+        ) : (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onLogin} title="Вхід для учасників клану">
+            Увійти
+          </button>
+        ))}
         <button
           type="button"
           className="theme-toggle"

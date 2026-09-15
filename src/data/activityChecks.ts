@@ -6,7 +6,7 @@
 // правди).
 // =========================================================
 
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 import { kyivDateString } from './types';
 
 export interface ActivityCheck {
@@ -17,7 +17,7 @@ export interface ActivityCheck {
 interface ActivityCheckDbRow { activity_id: string; newbie_id: string }
 
 export async function fetchTodayChecks(): Promise<ActivityCheck[]> {
-  const { data, error } = await supabase
+  const { data, error } = await readClient()
     .from('activity_checks')
     .select('activity_id, newbie_id')
     .eq('check_date', kyivDateString());
@@ -46,7 +46,7 @@ export async function setCheck(activityId: string, newbieId: string, checked: bo
  * календаря відвідуваності на /newbies. Ключ мапи — YYYY-MM-DD, значення —
  * set activity_id, відвіданих у той день. */
 export async function fetchNewbieChecksRange(newbieId: string, fromDate: string, toDate: string): Promise<Map<string, Set<string>>> {
-  const { data, error } = await supabase
+  const { data, error } = await readClient()
     .from('activity_checks')
     .select('activity_id, check_date')
     .eq('newbie_id', newbieId)

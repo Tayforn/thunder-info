@@ -1,4 +1,4 @@
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 import type { Activity } from './types';
 
 interface ActivityDbRow { id: string; name: string; points: number; weekdays: number[]; sort_order: number }
@@ -8,7 +8,7 @@ function fromDb(r: ActivityDbRow): Activity {
 }
 
 export async function fetchActivities(): Promise<Activity[]> {
-  const { data, error } = await supabase.from('activities').select('*').order('sort_order', { ascending: true });
+  const { data, error } = await readClient().from('activities').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
   return (data as ActivityDbRow[]).map(fromDb);
 }

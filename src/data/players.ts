@@ -1,4 +1,4 @@
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 import type { Player } from './types';
 
 interface PlayerDbRow { id: string; nickname: string; class_id: string | null; note: string | null; created_at: string }
@@ -8,7 +8,7 @@ function fromDb(r: PlayerDbRow): Player {
 }
 
 export async function fetchPlayers(): Promise<Player[]> {
-  const { data, error } = await supabase.from('players').select('*').order('nickname', { ascending: true });
+  const { data, error } = await readClient().from('players').select('*').order('nickname', { ascending: true });
   if (error) throw error;
   return (data as PlayerDbRow[]).map(fromDb);
 }
@@ -43,8 +43,8 @@ export interface PlayerTotal { playerId: string; activityPoints: number; bonusPo
  * + ручні премії (player_bonuses). range (включно, YYYY-MM-DD) — для
  * фільтра "бали за період" у ростері; без нього — за весь час. */
 export async function fetchPlayerTotals(range?: { from: string; to: string }): Promise<PlayerTotal[]> {
-  let checksQuery = supabase.from('player_activity_checks').select('player_id, activities(points)');
-  let bonusesQuery = supabase.from('player_bonuses').select('player_id, points');
+  let checksQuery = readClient().from('player_activity_checks').select('player_id, activities(points)');
+  let bonusesQuery = readClient().from('player_bonuses').select('player_id, points');
   if (range) {
     checksQuery = checksQuery.gte('check_date', range.from).lte('check_date', range.to);
     bonusesQuery = bonusesQuery.gte('bonus_date', range.from).lte('bonus_date', range.to);
@@ -86,7 +86,7 @@ export async function promoteNewbieToPlayer(newbie: { id: string; nickname: stri
   if (insertErr) throw insertErr;
   const playerId = (created as { id: string }).id;
 
-  const { data: checks, error: checksErr } = await supabase
+  const { data: checks, error: checksErr } = await readClient()
     .from('activity_checks')
     .select('activity_id, check_date, checked_by')
     .eq('newbie_id', newbie.id);

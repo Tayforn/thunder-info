@@ -1,18 +1,17 @@
 // =========================================================
-// Сайдбар: статичні пункти (Головна/Р8 фарм/Новачки) + сторінки, що потребують
-// адмінських прав (Активність/Р8/Адмінка) — видимі в меню лише коли
-// isAdmin, хоча самі роути й так гейтяться через AdminGate незалежно
-// від видимості в меню.
+// Сайдбар: перелік розділів за рівнем доступу (app/access.ts) — гість бачить
+// лише публічні, учасник клану ще й свої, адмін — усе. Сам доступ до даних
+// гейтиться на сервері, меню лише не показує зайвого.
 // =========================================================
 
 import type { ReactNode } from 'react';
 import type { Route } from '../app/useRoute';
+import { canOpen, type Viewer } from '../app/access';
 
 interface NavEntry {
   route: Route;
   label: string;
   ico: ReactNode;
-  adminOnly?: boolean;
 }
 
 const S = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
@@ -31,21 +30,22 @@ function routeKey(r: Route): string {
 
 interface Props {
   route: Route;
-  isAdmin: boolean;
+  viewer: Viewer;
   onNavigate: (route: Route) => void;
 }
 
-export default function Sidebar({ route, isAdmin, onNavigate }: Props) {
+export default function Sidebar({ route, viewer, onNavigate }: Props) {
   const allItems: NavEntry[] = [
     { route: { name: 'home' }, label: 'Головна', ico: homeIco },
     { route: { name: 'farm' }, label: 'Р8 фарм', ico: coinsIco },
     { route: { name: 'newbies' }, label: 'Новачки', ico: listIco },
     { route: { name: 'players' }, label: 'Гравці', ico: usersIco },
-    { route: { name: 'activity' }, label: 'Активність', ico: boltIco, adminOnly: true },
-    { route: { name: 'r8' }, label: 'Р8', ico: swordIco, adminOnly: true },
-    { route: { name: 'admin' }, label: 'Адмінка', ico: adminIco, adminOnly: true },
+    { route: { name: 'activity' }, label: 'Активність', ico: boltIco },
+    { route: { name: 'r8' }, label: 'Р8', ico: swordIco },
+    { route: { name: 'admin' }, label: 'Адмінка', ico: adminIco },
   ];
-  const items = allItems.filter((n) => !n.adminOnly || isAdmin);
+  // Показуємо лише те, що людина реально може відкрити.
+  const items = allItems.filter((n) => canOpen(n.route.name, viewer));
 
   const activeKey = routeKey(route);
 

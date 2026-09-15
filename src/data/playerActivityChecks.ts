@@ -5,7 +5,7 @@
 // (сьогодні й минулі дні), календар на /players — з діапазоном за місяць.
 // =========================================================
 
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 
 export interface PlayerActivityCheck {
   activityId: string;
@@ -15,7 +15,7 @@ export interface PlayerActivityCheck {
 interface PlayerCheckDbRow { activity_id: string; player_id: string; check_date: string }
 
 export async function fetchPlayerChecksOnDate(checkDate: string): Promise<PlayerActivityCheck[]> {
-  const { data, error } = await supabase
+  const { data, error } = await readClient()
     .from('player_activity_checks')
     .select('activity_id, player_id')
     .eq('check_date', checkDate);
@@ -46,7 +46,7 @@ export async function setPlayerCheckOnDate(activityId: string, playerId: string,
  * календаря відвідуваності. Ключ мапи — YYYY-MM-DD, значення — set
  * activity_id, відвіданих у той день. */
 export async function fetchPlayerChecksRange(playerId: string, fromDate: string, toDate: string): Promise<Map<string, Set<string>>> {
-  const { data, error } = await supabase
+  const { data, error } = await readClient()
     .from('player_activity_checks')
     .select('activity_id, check_date')
     .eq('player_id', playerId)

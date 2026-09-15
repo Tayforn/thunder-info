@@ -4,7 +4,7 @@
 // повторне збереження = upsert по unique(player_id, bonus_date).
 // =========================================================
 
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 import type { PlayerBonus } from './types';
 
 interface BonusDbRow { id: string; player_id: string; bonus_date: string; points: number; note: string | null }
@@ -16,7 +16,7 @@ function fromDb(r: BonusDbRow): PlayerBonus {
 /** Премії одного гравця за діапазон дат (включно) — для календаря.
  * Ключ мапи — YYYY-MM-DD. */
 export async function fetchPlayerBonusesRange(playerId: string, fromDate: string, toDate: string): Promise<Map<string, PlayerBonus>> {
-  const { data, error } = await supabase
+  const { data, error } = await readClient()
     .from('player_bonuses')
     .select('*')
     .eq('player_id', playerId)
@@ -29,7 +29,7 @@ export async function fetchPlayerBonusesRange(playerId: string, fromDate: string
 /** Премії всіх гравців за один день — для колонки "Премія" на /activity.
  * Ключ мапи — player_id. */
 export async function fetchBonusesOnDate(bonusDate: string): Promise<Map<string, PlayerBonus>> {
-  const { data, error } = await supabase.from('player_bonuses').select('*').eq('bonus_date', bonusDate);
+  const { data, error } = await readClient().from('player_bonuses').select('*').eq('bonus_date', bonusDate);
   if (error) throw error;
   return new Map((data as BonusDbRow[]).map((r) => [r.player_id, fromDb(r)]));
 }

@@ -1,4 +1,4 @@
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 import type { ClassRow } from './types';
 
 interface ClassDbRow { id: string; name: string; coef: number; sort_order: number }
@@ -8,7 +8,7 @@ function fromDb(r: ClassDbRow): ClassRow {
 }
 
 export async function fetchClasses(): Promise<ClassRow[]> {
-  const { data, error } = await supabase.from('classes').select('*').order('sort_order', { ascending: true });
+  const { data, error } = await readClient().from('classes').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
   return (data as ClassDbRow[]).map(fromDb);
 }

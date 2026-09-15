@@ -1,4 +1,4 @@
-import { supabase } from '../app/supabaseClient';
+import { readClient, supabase } from '../app/supabaseClient';
 import type { Newbie } from './types';
 
 interface NewbieDbRow { id: string; nickname: string; class_id: string | null; note: string | null; created_at: string }
@@ -8,7 +8,7 @@ function fromDb(r: NewbieDbRow): Newbie {
 }
 
 export async function fetchNewbies(): Promise<Newbie[]> {
-  const { data, error } = await supabase.from('newbies').select('*').order('nickname', { ascending: true });
+  const { data, error } = await readClient().from('newbies').select('*').order('nickname', { ascending: true });
   if (error) throw error;
   return (data as NewbieDbRow[]).map(fromDb);
 }
@@ -42,7 +42,7 @@ export interface NewbieTotal { newbieId: string; totalPoints: number }
  * дні; бали "за сьогодні" (ще не нараховані крон-джобом) рахуються окремо
  * на клієнті з activity_checks, див. src/data/activityChecks.ts. */
 export async function fetchNewbieTotals(): Promise<NewbieTotal[]> {
-  const { data, error } = await supabase.from('point_awards').select('newbie_id, points');
+  const { data, error } = await readClient().from('point_awards').select('newbie_id, points');
   if (error) throw error;
   const totals = new Map<string, number>();
   for (const row of data as { newbie_id: string; points: number }[]) {
