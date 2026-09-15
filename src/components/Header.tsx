@@ -40,7 +40,7 @@ export default function Header({ navOpen, onNavToggle }: Props) {
           </span>
           <span className="logo-text">Thunder</span>
         </a>
-        <a href="https://ladder.thunderpw.fun/" className="btn btn-ghost btn-sm" title="Ладдер страждання">Ладдер</a>
+        <a href="https://ladder.thunderpw.fun/" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} title="Ладдер страждання">Ладдер</a>
         <a href="https://calc.thunderpw.fun/" className="btn btn-ghost btn-sm" title="PW Хелпер — калькулятори">Хелпер</a>
         <a href="https://pvp.thunderpw.fun/" className="btn btn-ghost btn-sm" title="PvP — турніри сервера">PvP</a>
         <button
