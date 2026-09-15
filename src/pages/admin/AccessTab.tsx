@@ -76,8 +76,8 @@ export default function AccessTab() {
         <p className="hint">Завантаження…</p>
       ) : (
         <AdminTable
-          columns="2fr 1.6fr 1.1fr auto"
-          header={['Нік', 'Останній вхід', 'Статус', '']}
+          columns="2fr 1.4fr 1fr 120px"
+          header={['Нік', 'Останній вхід', 'Статус', 'Дія']}
           rows={shown}
           keyFn={(p) => p.id}
           emptyLabel={players.length === 0 ? 'Ще ніхто не входив через Discord.' : 'Нікого не знайдено.'}
