@@ -2,7 +2,7 @@ export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="container footer-inner">
-        <span>© {new Date().getFullYear()} Thunder · Внутрішній інструмент гільдії</span>
+        <span>© {new Date().getFullYear()} Thunder · Внутрішній інструмент гільдії · by Тайфорн</span>
         <span className="muted">Perfect World та пов'язані назви належать їхнім власникам.</span>
       </div>
     </footer>
