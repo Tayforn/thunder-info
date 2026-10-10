@@ -2,6 +2,10 @@
 // Спільний гейт для сторінок, що потребують адмінських прав
 // (/activity, /r8, /admin) — витягнутий з LoginForm-патерну pw-pvp
 // AdminPage.tsx, бо тут він потрібен трьом сторінкам, а не одній.
+//
+// allow: 'admin' (за замовчуванням) — лише повні адміни; 'events' — і адміни
+// евентів (role = 'events', міграція 0008) — для /admin, де вони бачать
+// лише таб «Евенти».
 // =========================================================
 
 import { useState, type ReactNode } from 'react';
@@ -46,12 +50,23 @@ function LoginForm() {
   );
 }
 
-export default function AdminGate({ children }: { children: (session: Session) => ReactNode }) {
-  const { session, isAdmin, loading } = useAuth();
+export default function AdminGate({ allow = 'admin', children }: { allow?: 'admin' | 'events'; children: (session: Session) => ReactNode }) {
+  const { session, role, loading } = useAuth();
 
   if (loading) return <p className="hint">Перевірка сесії…</p>;
   if (!session) return <LoginForm />;
-  if (!isAdmin) {
+  if (role === 'events' && allow === 'admin') {
+    return (
+      <div className="card">
+        <p>Цей акаунт має доступ лише до розділу «Евенти» в адмінці.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-primary" data-goto="admin">До евентів</button>
+          <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>
+        </div>
+      </div>
+    );
+  }
+  if (!role) {
     return (
       <div className="card">
         <p>Цей акаунт не має прав адміністратора Thunder.</p>

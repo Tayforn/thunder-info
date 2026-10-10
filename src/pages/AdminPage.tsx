@@ -2,12 +2,13 @@
 // /admin — 7 табів: шість "табличних" CRUD-панелей (AdminTable) —
 // Новачки, Гравці, Ціна лута, Активності, Евенти, Приоритетність класів —
 // і «Доступ»: хто входив через Discord, з баном/розбаном.
+// Адмін з роллю 'events' (міграція 0008) бачить лише «Евенти».
 // =========================================================
 
 import { useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import { supabase } from '../app/supabaseClient';
-import { useAuth } from '../app/useAuth';
+import { useAuth, type AdminRole } from '../app/useAuth';
 import AdminGate from '../components/AdminGate';
 import NewbiesTab from './admin/NewbiesTab';
 import PlayersTab from './admin/PlayersTab';
@@ -33,15 +34,16 @@ const TABS: { name: TabName; label: string }[] = [
 // F5) — ключ у localStorage, той самий підхід, що thunder-theme у Header.
 const TAB_STORAGE_KEY = 'thunder-admin-tab';
 
-function AdminTabs() {
+function AdminTabs({ role }: { role: AdminRole }) {
+  const tabs = role === 'events' ? TABS.filter((t) => t.name === 'events') : TABS;
   const [tab, setTab] = useState<TabName>(() => {
     try {
       const saved = localStorage.getItem(TAB_STORAGE_KEY);
-      if (TABS.some((t) => t.name === saved)) return saved as TabName;
+      if (tabs.some((t) => t.name === saved)) return saved as TabName;
     } catch {
       /* ignore */
     }
-    return 'newbies';
+    return tabs[0].name;
   });
 
   const selectTab = (t: TabName) => {
@@ -56,7 +58,7 @@ function AdminTabs() {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 24 }} role="tablist" aria-label="Адмін-таби">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.name}
             type="button"
@@ -81,7 +83,7 @@ function AdminTabs() {
 }
 
 export default function AdminPage() {
-  const { session } = useAuth();
+  const { session, role } = useAuth();
   return (
     <div>
       <PageMeta title="Адмінка — Thunder" />
@@ -92,7 +94,7 @@ export default function AdminPage() {
         </div>
         {session && <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>}
       </div>
-      <AdminGate>{() => <AdminTabs />}</AdminGate>
+      <AdminGate allow="events">{() => <AdminTabs role={role ?? 'admin'} />}</AdminGate>
     </div>
   );
 }

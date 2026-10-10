@@ -10,7 +10,8 @@
    працює вхід через Discord, див. коментар у файлі) і `migrations/0005_events_discord.sql`
    (таб «Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)),
    `migrations/0006_stable_sort_order.sql` (стабільний порядок рядків в «Активностях» і «Евентах»),
-   `migrations/0007_discord_scheduled_events.sql` (тривалість евента + «Події» Discord).
+   `migrations/0007_discord_scheduled_events.sql` (тривалість евента + «Події» Discord),
+   `migrations/0008_admin_roles.sql` (роль адміна: повний доступ або лише «Евенти»).
    - Якщо рядок `create extension if not exists pg_cron;` впаде через права доступу — увімкни pg_cron вручну через
      **Dashboard → Database → Extensions**, потім запусти міграцію ще раз (вона ідемпотентна, `create table if not exists` і `on conflict do nothing` не зашкодять).
 3. **Project Settings → API** — скопіюй `Project URL` і `anon public` ключ у `.env.local`:
@@ -25,7 +26,14 @@
      insert into admins (user_id, email)
      select id, email from auth.users where email = 'you@example.com';
      ```
-   - Так само додай усіх інших адмінів гільдії (усі рівноправні — без ролей superadmin/gm).
+   - Так само додай усіх інших адмінів гільдії. Усі вони повні (role = 'admin').
+   - Адмін лише для «Евентів» (бачить у адмінці один таб, пост у Discord, пінги, «Події»;
+     решта адмінки, /activity і /r8 закриті):
+     ```sql
+     insert into admins (user_id, email, role)
+     select id, email, 'events' from auth.users where email = 'events@example.com';
+     ```
+     Змінити роль наявному: `update admins set role = 'events' where email = '…';` (і назад — `'admin'`).
 5. Проставте ціни в Адмінці (`/admin` → «Ціна лута») — 5 стартових валютних айтемів КХ додані з ціною 0, решту (камені) додавайте самі.
 
 **Важливо:** безкоштовний проєкт автоматично паузиться після ~7 днів без запитів до API — якщо трафік малий, раз на тиждень заходь у дашборд і тисни "Restore project".

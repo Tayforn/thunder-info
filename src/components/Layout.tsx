@@ -27,9 +27,9 @@ const isMobile = () => window.matchMedia('(max-width: 880px)').matches;
 
 export default function Layout() {
   const [route, navigate] = useRoute();
-  const { session, isAdmin, loading: adminLoading } = useAuth();
+  const { session, isAdmin, role, loading: adminLoading } = useAuth();
   const { me, loading: meLoading, login, logout } = useMe();
-  const viewer = { member: !!me, admin: isAdmin };
+  const viewer = { member: !!me, admin: isAdmin, eventsAdmin: role === 'events' };
 
   // Адмін має сесію Supabase — читає дані напряму, Discord йому не потрібен.
   useEffect(() => {

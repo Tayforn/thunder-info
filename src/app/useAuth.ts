@@ -3,24 +3,28 @@
 // таблиці `admins` (RLS-функція is_admin() дзеркалить цю ж перевірку на
 // стороні бази — цей хук лише для UI-стану).
 //
-// На відміну від pw-pvp тут немає ролей (superadmin/gm) — усі адміни
-// Thunder рівноправні (будь-хто може редагувати новачків/лут/активності
-// і ставити галочки на /activity).
+// Ролі (міграція 0008): 'admin' — усе; 'events' — лише таб «Евенти» в
+// адмінці. isAdmin = повний адмін; role !== null = будь-який адмін.
 // =========================================================
 
 import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 
+export type AdminRole = 'admin' | 'events';
+
 interface AuthState {
   session: Session | null;
+  /** Повний адмін (role = 'admin'). */
   isAdmin: boolean;
+  /** null — не адмін. */
+  role: AdminRole | null;
   loading: boolean;
 }
 
 export function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<AdminRole | null>(null);
   const [loading, setLoading] = useState(true);
   // Останній перевірений user id — щоб відрізняти реальну зміну користувача
   // (вхід/вихід) від TOKEN_REFRESHED, який supabase-js кидає щоразу, коли
@@ -34,11 +38,13 @@ export function useAuth(): AuthState {
 
     async function checkAdmin(s: Session | null) {
       if (!s) {
-        if (!cancelled) setIsAdmin(false);
+        if (!cancelled) setRole(null);
         return;
       }
-      const { data } = await supabase.from('admins').select('user_id').eq('user_id', s.user.id).maybeSingle();
-      if (!cancelled) setIsAdmin(!!data);
+      // select('*'): до міграції 0008 колонки role ще немає — тоді всі адміни повні.
+      const { data } = await supabase.from('admins').select('*').eq('user_id', s.user.id).maybeSingle();
+      const row = data as { role?: string } | null;
+      if (!cancelled) setRole(row ? (row.role === 'events' ? 'events' : 'admin') : null);
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -63,5 +69,5 @@ export function useAuth(): AuthState {
     };
   }, []);
 
-  return { session, isAdmin, loading };
+  return { session, isAdmin: role === 'admin', role, loading };
 }
