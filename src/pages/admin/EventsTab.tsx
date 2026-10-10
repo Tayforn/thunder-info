@@ -30,7 +30,7 @@ import {
 import type { Activity, GuildEvent } from '../../data/types';
 import { WEEKDAY_LABELS, WEEKDAY_LABELS_FULL, kyivDateString, todayWeekday } from '../../data/types';
 
-const COLUMNS = '1.3fr 300px 240px 64px 150px';
+const COLUMNS = '1.2fr 300px 180px 180px 60px 150px';
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -78,7 +78,7 @@ function MinutesInput({ initial, min, max, placeholder, onSave }: { initial: num
     }
     if (n !== initial) onSave(n);
   };
-  return <input type="number" min={min} max={max} value={value} placeholder={placeholder ?? '—'} style={{ width: 70 }} onChange={(e) => setValue(e.target.value)} onBlur={commit} />;
+  return <input type="number" min={min} max={max} value={value} placeholder={placeholder ?? '—'} onChange={(e) => setValue(e.target.value)} onBlur={commit} />;
 }
 
 /** "Коли": щотижня (дні тижня) або разово (дата). Дата має пріоритет —
@@ -231,7 +231,7 @@ export default function EventsTab() {
   };
 
   return (
-    <div>
+    <div className="events-admin">
       <h3>Евенти</h3>
       <p className="hint" style={{ marginTop: 0 }}>
         Що піде в щоденний пост у Discord. Нові активності з'являються тут самі; назву, дні, час і пінг можна міняти незалежно
@@ -270,32 +270,35 @@ export default function EventsTab() {
 
       <AdminTable
         columns={COLUMNS}
-        header={['Назва · примітка', 'Коли', 'Час · пінг', 'Увімк.', '']}
+        header={['Назва · примітка', 'Коли', 'Час · роль для пінгу', 'Пінг · тривалість', 'Увімк.', '']}
         rows={events}
         keyFn={(e) => e.id}
         emptyLabel="Евентів ще немає — додай нижче або підтягни з активностей."
         renderRow={(e) => {
           const activity = e.activityId ? activityById.get(e.activityId) : undefined;
           const diverged = divergedFromActivity(e, activity);
+          const dim = { opacity: e.enabled ? 1 : 0.55 };
           return [
-            <span key="name" style={{ display: 'grid', gap: 6, opacity: e.enabled ? 1 : 0.55 }}>
+            <span key="name" className="cell-stack" style={dim}>
               <TextInput initial={e.name} onSave={(v) => patch(e.id, { name: v })} />
-              <TextInput initial={e.note ?? ''} placeholder="Примітка для поста (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { note: v })} />
-              {activity && <span className="hint" style={{ fontSize: 12 }}>з активності «{activity.name}»</span>}
+              <TextInput initial={e.note ?? ''} placeholder="Примітка (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { note: v })} />
+              {activity && <span className="hint cell-note">з активності «{activity.name}»</span>}
             </span>,
-            <span key="when" style={{ opacity: e.enabled ? 1 : 0.55 }}>
+            <span key="when" className="cell-stack" style={dim}>
               <WhenPicker weekdays={e.weekdays} eventDate={e.eventDate} onChange={(p) => patch(e.id, p)} />
-              {!e.eventDate && e.weekdays.length === 0 && <span className="hint" style={{ fontSize: 12 }}>дні не вибрано — у пост не потрапить</span>}
+              {!e.eventDate && e.weekdays.length === 0 && <span className="hint cell-note">дні не вибрано — у пост не потрапить</span>}
             </span>,
-            <span key="time" style={{ display: 'grid', gap: 6, opacity: e.enabled ? 1 : 0.55 }}>
+            <span key="time" className="cell-stack" style={dim}>
               <TimeInput initial={e.startTime} onSave={(v) => patch(e.id, { startTime: v })} />
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} className="hint">
+              <TextInput initial={e.pingRoleId ?? ''} placeholder="ID ролі (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { pingRoleId: v })} />
+            </span>,
+            <span key="ping" className="cell-stack" style={dim}>
+              <span className="inline-num hint" title="За скільки хвилин до початку пінгнути роль у каналі; порожньо = не пінгувати">
                 пінг за <MinutesInput initial={e.pingMinutesBefore} min={1} max={180} onSave={(v) => patch(e.id, { pingMinutesBefore: v })} /> хв
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} className="hint" title="Тривалість для «Події» Discord; порожньо = 60 хв">
+              <span className="inline-num hint" title="Тривалість для «Події» Discord; порожньо = 60 хв">
                 триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => patch(e.id, { durationMinutes: v })} /> хв
               </span>
-              <TextInput initial={e.pingRoleId ?? ''} placeholder="ID ролі для пінгу (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { pingRoleId: v })} />
             </span>,
             <input key="on" type="checkbox" checked={e.enabled} title={e.enabled ? 'Увімкнено — потрапляє в пост' : 'Вимкнено — у пост не потрапляє'} onChange={(ev) => patch(e.id, { enabled: ev.target.checked })} style={{ accentColor: 'var(--accent)', width: 18, height: 18, cursor: 'pointer' }} />,
             <span key="actions" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

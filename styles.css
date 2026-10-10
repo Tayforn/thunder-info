@@ -463,6 +463,17 @@ html[data-theme="light"] .theme-ico-moon { display: inline; }
 .rowlist-empty { padding: 20px 18px; }
 .rowlist-add { padding: 14px 18px; border-top: 1px solid var(--line-2); display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 
+/* ── Таб «Евенти»: по два поля в комірці, компактні інпути ──── */
+.events-admin .rowlist-row { padding: 12px 18px; }
+.events-admin .rowlist-row input[type='text'], .events-admin .rowlist-row input[type='time'],
+.events-admin .rowlist-row input[type='date'], .events-admin .rowlist-row input[type='number'] {
+  padding: 8px 10px; font-size: 14px;
+}
+.events-admin .cell-stack { display: grid; gap: 6px; align-content: center; min-width: 0; }
+.events-admin .cell-note { font-size: 12px; }
+.events-admin .inline-num { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.events-admin .inline-num input { width: 64px; flex: 0 0 auto; }
+
 /* ════════════════════════════════════════════════════════
    LIGHT THEME — грозове небо: сталево-сірий + червоний спалах
    ════════════════════════════════════════════════════════ */
