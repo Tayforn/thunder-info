@@ -8,7 +8,8 @@
    `migrations/0003_bonuses_realtime.sql` (realtime для колонки "Премія" на /activity),
    `migrations/0004_guild_read_gate.sql` (закриття даних гільдії від анонімів — лише після того, як
    працює вхід через Discord, див. коментар у файлі) і `migrations/0005_events_discord.sql`
-   (таб «Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)).
+   (таб «Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)),
+   `migrations/0006_stable_sort_order.sql` (стабільний порядок рядків в «Активностях» і «Евентах»).
    - Якщо рядок `create extension if not exists pg_cron;` впаде через права доступу — увімкни pg_cron вручну через
      **Dashboard → Database → Extensions**, потім запусти міграцію ще раз (вона ідемпотентна, `create table if not exists` і `on conflict do nothing` не зашкодять).
 3. **Project Settings → API** — скопіюй `Project URL` і `anon public` ключ у `.env.local`:

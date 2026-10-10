@@ -8,7 +8,13 @@ function fromDb(r: ActivityDbRow): Activity {
 }
 
 export async function fetchActivities(): Promise<Activity[]> {
-  const { data, error } = await readClient().from('activities').select('*').order('sort_order', { ascending: true });
+  // Тайбрейкери created_at + id — стабільний порядок при однакових sort_order.
+  const { data, error } = await readClient()
+    .from('activities')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
   if (error) throw error;
   return (data as ActivityDbRow[]).map(fromDb);
 }

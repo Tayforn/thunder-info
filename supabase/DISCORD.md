@@ -22,6 +22,7 @@
 ## Крок 1. Міграція
 
 Dashboard → **SQL Editor** → New query → встав увесь `migrations/0005_events_discord.sql` → **Run**.
+Потім так само `migrations/0006_stable_sort_order.sql` (стабільний порядок рядків у табі).
 
 Міграція ідемпотентна. Якщо впаде рядок `create extension if not exists pg_net`
 (або `pg_cron`) — увімкни їх руками через **Database → Extensions** і запусти файл ще раз.

@@ -48,11 +48,14 @@ function fromDb(r: EventDbRow): GuildEvent {
 }
 
 export async function fetchEvents(): Promise<GuildEvent[]> {
+  // Тайбрейкери created_at + id — щоб порядок не змінювався після update
+  // (однакові sort_order/created_at Postgres віддає в довільному порядку).
   const { data, error } = await supabase
     .from('events')
     .select('*')
     .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
   if (error) throw error;
   return (data as EventDbRow[]).map(fromDb);
 }
@@ -105,10 +108,11 @@ export function activitiesWithoutEvent(activities: Activity[], events: GuildEven
   return activities.filter((a) => !linked.has(a.id));
 }
 
-/** Створити евенти з активностей (назва + дні тижня, без часу). */
+/** Створити евенти з активностей (назва + дні тижня, без часу; sort_order
+ * призначить тригер у БД — наступний номер у events). */
 export async function importActivities(activities: Activity[]): Promise<void> {
   if (activities.length === 0) return;
-  const rows = activities.map((a) => ({ activity_id: a.id, name: a.name, weekdays: a.weekdays, sort_order: a.sortOrder }));
+  const rows = activities.map((a) => ({ activity_id: a.id, name: a.name, weekdays: a.weekdays }));
   const { error } = await supabase.from('events').insert(rows);
   if (error) throw error;
 }
