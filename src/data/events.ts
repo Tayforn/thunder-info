@@ -20,6 +20,7 @@ interface EventDbRow {
   event_date: string | null;
   start_time: string | null;
   note: string | null;
+  duration_minutes: number | null;
   ping_minutes_before: number | null;
   ping_role_id: string | null;
   enabled: boolean;
@@ -40,6 +41,7 @@ function fromDb(r: EventDbRow): GuildEvent {
     eventDate: r.event_date,
     startTime: hhmm(r.start_time),
     note: r.note,
+    durationMinutes: r.duration_minutes,
     pingMinutesBefore: r.ping_minutes_before,
     pingRoleId: r.ping_role_id,
     enabled: r.enabled,
@@ -66,6 +68,7 @@ export interface EventInput {
   eventDate: string | null;
   startTime: string | null;
   note: string | null;
+  durationMinutes: number | null;
   pingMinutesBefore: number | null;
   pingRoleId: string | null;
   enabled: boolean;
@@ -79,6 +82,7 @@ function toDb(patch: Partial<EventInput>): Record<string, unknown> {
   if (patch.eventDate !== undefined) db.event_date = patch.eventDate || null;
   if (patch.startTime !== undefined) db.start_time = patch.startTime || null;
   if (patch.note !== undefined) db.note = patch.note?.trim() || null;
+  if (patch.durationMinutes !== undefined) db.duration_minutes = patch.durationMinutes;
   if (patch.pingMinutesBefore !== undefined) db.ping_minutes_before = patch.pingMinutesBefore;
   if (patch.pingRoleId !== undefined) db.ping_role_id = patch.pingRoleId?.trim() || null;
   if (patch.enabled !== undefined) db.enabled = patch.enabled;
@@ -184,6 +188,9 @@ export interface SyncResult {
   post: 'created' | 'edited' | 'unchanged';
   pings: string[];
   cleaned: number;
+  /** «Події» Discord; null — бот/сервер не налаштовані. */
+  scheduled: { created: number; updated: number; deleted: number; started: number } | null;
+  warnings: string[];
 }
 
 export interface CleanResult {

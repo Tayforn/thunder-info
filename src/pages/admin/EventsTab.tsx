@@ -67,18 +67,18 @@ function TimeInput({ initial, onSave }: { initial: string | null; onSave: (v: st
   return <input type="time" value={value} onChange={(e) => setValue(e.target.value)} onBlur={commit} />;
 }
 
-function MinutesInput({ initial, onSave }: { initial: number | null; onSave: (v: number | null) => void }) {
+function MinutesInput({ initial, min, max, placeholder, onSave }: { initial: number | null; min: number; max: number; placeholder?: string; onSave: (v: number | null) => void }) {
   const [value, setValue] = useState(initial === null ? '' : String(initial));
   useEffect(() => setValue(initial === null ? '' : String(initial)), [initial]);
   const commit = () => {
     const n = value.trim() === '' ? null : Number(value);
-    if (n !== null && (!Number.isInteger(n) || n < 1 || n > 180)) {
+    if (n !== null && (!Number.isInteger(n) || n < min || n > max)) {
       setValue(initial === null ? '' : String(initial));
       return;
     }
     if (n !== initial) onSave(n);
   };
-  return <input type="number" min={1} max={180} value={value} placeholder="—" style={{ width: 70 }} onChange={(e) => setValue(e.target.value)} onBlur={commit} />;
+  return <input type="number" min={min} max={max} value={value} placeholder={placeholder ?? '—'} style={{ width: 70 }} onChange={(e) => setValue(e.target.value)} onBlur={commit} />;
 }
 
 /** "Коли": щотижня (дні тижня) або разово (дата). Дата має пріоритет —
@@ -119,11 +119,14 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
     try {
       if (what === 'sync') {
         const r = await triggerDiscordSync();
+        const sch = r.scheduled;
         setResult(
           `${postLabel[r.post]}, евентів на ${dateLabel(r.date)}: ${r.events}` +
             (r.pings.length > 0 ? `, пінги: ${r.pings.join(', ')}` : '') +
             (r.cleaned > 0 ? `, прибрано старих пінгів: ${r.cleaned}` : '') +
-            '.',
+            (sch ? `; події Discord: +${sch.created} / змінено ${sch.updated} / −${sch.deleted}` + (sch.started > 0 ? ` / стартовано ${sch.started}` : '') : '') +
+            '.' +
+            (r.warnings?.length ? ` Увага: ${r.warnings.join('; ')}` : ''),
         );
         onSynced();
       } else {
@@ -287,7 +290,10 @@ export default function EventsTab() {
             <span key="time" style={{ display: 'grid', gap: 6, opacity: e.enabled ? 1 : 0.55 }}>
               <TimeInput initial={e.startTime} onSave={(v) => patch(e.id, { startTime: v })} />
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} className="hint">
-                пінг за <MinutesInput initial={e.pingMinutesBefore} onSave={(v) => patch(e.id, { pingMinutesBefore: v })} /> хв
+                пінг за <MinutesInput initial={e.pingMinutesBefore} min={1} max={180} onSave={(v) => patch(e.id, { pingMinutesBefore: v })} /> хв
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} className="hint" title="Тривалість для «Події» Discord; порожньо = 60 хв">
+                триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => patch(e.id, { durationMinutes: v })} /> хв
               </span>
               <TextInput initial={e.pingRoleId ?? ''} placeholder="ID ролі для пінгу (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { pingRoleId: v })} />
             </span>,

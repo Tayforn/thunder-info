@@ -11,6 +11,11 @@
 //   POST /discord-events/clean    → прибрати з каналу ВСІ надіслані пінги
 //                                   (і сьогоднішні); пост лишається.
 //
+// З ботом (DISCORD_BOT_TOKEN + DISCORD_GUILD_ID) sync ще й веде «Події»
+// сервера (Scheduled Events): по одній на кожен евент з часом на найближчі
+// DISCORD_EVENTS_DAYS днів (7), оновлює при змінах, прибирає, якщо евент
+// вимкнули, і переводить у «активна», коли настав час.
+//
 // Авторизація (будь-який варіант):
 //   * заголовок  x-api-key: <EVENTS_API_KEY>   — крон/скрипти;
 //   * Authorization: Bearer <EVENTS_API_KEY>   — те саме;
@@ -21,8 +26,11 @@
 // EVENTS_API_KEY (обов'язково), DISCORD_PING_ROLE_ID (роль за замовчуванням
 // для пінгів; без неї і без ролі в евенті — @here), DISCORD_BOT_TOKEN
 // (необов'язково: закріпити пост у каналі — вебхук цього не вміє).
-// SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY Supabase
-// підставляє сам.
+// Для «Подій»: DISCORD_GUILD_ID (ID сервера), DISCORD_EVENT_LOCATION (текст
+// «місця» події, напр. "#евенти"; Discord не вміє прив'язати подію до
+// текстового каналу, тож це просто напис), DISCORD_EVENTS_DAYS (горизонт,
+// за замовчуванням 7). SUPABASE_URL / SUPABASE_ANON_KEY /
+// SUPABASE_SERVICE_ROLE_KEY Supabase підставляє сам.
 //
 // Деплой: supabase functions deploy discord-events --no-verify-jwt
 // (повна інструкція — supabase/DISCORD.md).
@@ -43,6 +51,11 @@ const EVENTS_API_KEY = env('EVENTS_API_KEY');
 const DISCORD_WEBHOOK_URL = env('DISCORD_WEBHOOK_URL');
 const DISCORD_PING_ROLE_ID = env('DISCORD_PING_ROLE_ID');
 const DISCORD_BOT_TOKEN = env('DISCORD_BOT_TOKEN');
+const DISCORD_GUILD_ID = env('DISCORD_GUILD_ID');
+const DISCORD_EVENT_LOCATION = env('DISCORD_EVENT_LOCATION') || 'Thunder';
+const DISCORD_EVENTS_DAYS = Math.min(30, Math.max(1, Number(env('DISCORD_EVENTS_DAYS')) || 7));
+const DEFAULT_DURATION_MIN = 60;
+const DISCORD_API = 'https://discord.com/api/v10';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,9 +74,25 @@ interface EventRow {
   name: string;
   start_time: string | null; // "HH:MM:SS"
   note: string | null;
+  duration_minutes: number | null;
   ping_minutes_before: number | null;
   ping_role_id: string | null;
   sort_order: number;
+}
+
+/** events_in_range(): той самий рядок + дата, на яку він випадає. */
+interface RangeRow extends EventRow {
+  event_date: string;
+}
+
+interface ScheduledRow {
+  event_id: string;
+  event_date: string;
+  discord_event_id: string;
+  content_hash: string | null;
+  starts_at: string;
+  ends_at: string;
+  started: boolean;
 }
 
 interface PostState {
@@ -110,6 +139,24 @@ function toMinutes(t: string): number {
 function dateLabel(ymd: string): string {
   const [y, m, d] = ymd.split('-');
   return `${d}.${m}.${y}`;
+}
+
+function addDays(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Київський локальний час (дата + "HH:MM") → момент UTC, з урахуванням
+ * літнього/зимового часу на ту дату. */
+function kyivToUtc(date: string, time: string): Date {
+  const guess = new Date(`${date}T${time.slice(0, 5)}:00Z`);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(guess);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
+  return new Date(guess.getTime() - (wall - guess.getTime()));
 }
 
 // ---------------------------------------------------------
@@ -251,9 +298,7 @@ async function sha256(s: string): Promise<string> {
  * фатальні: пост уже створений, закріпити можна й руками. */
 async function pinMessage(channelId: string, messageId: string): Promise<string | null> {
   if (!DISCORD_BOT_TOKEN) return null;
-  const r = await discord('PUT', `https://discord.com/api/v10/channels/${channelId}/messages/pins/${messageId}`, undefined, {
-    Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
-  });
+  const r = await discord('PUT', `${DISCORD_API}/channels/${channelId}/messages/pins/${messageId}`, undefined, botHeaders());
   if (r.ok || r.status === 204) return null;
   return `pin: Discord відповів ${r.status} — ${(await r.text().catch(() => '')).slice(0, 200)}`;
 }
@@ -295,6 +340,173 @@ async function cleanPings(db: SupabaseClient): Promise<CleanResult> {
 }
 
 // ---------------------------------------------------------
+// «Події» сервера (Guild Scheduled Events) — лише з ботом.
+// Discord не вміє подію «в текстовому каналі»: тип EXTERNAL з текстовим
+// «місцем» (DISCORD_EVENT_LOCATION), час початку = евент, завершення =
+// + duration_minutes (60). Евенти без часу сюди не потрапляють.
+// ---------------------------------------------------------
+
+function botHeaders(): Record<string, string> {
+  return { Authorization: `Bot ${DISCORD_BOT_TOKEN}` };
+}
+
+function guildEventsUrl(id?: string): string {
+  return `${DISCORD_API}/guilds/${DISCORD_GUILD_ID}/scheduled-events${id ? `/${id}` : ''}`;
+}
+
+interface ScheduleResult {
+  created: number;
+  updated: number;
+  deleted: number;
+  started: number;
+}
+
+interface DesiredEvent {
+  key: string;
+  eventId: string;
+  date: string;
+  startMs: number;
+  endMs: number;
+  payload: Record<string, unknown>;
+  hash: string;
+}
+
+async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: string[]): Promise<ScheduleResult | null> {
+  if (!DISCORD_BOT_TOKEN || !DISCORD_GUILD_ID) return null;
+  const res: ScheduleResult = { created: 0, updated: 0, deleted: 0, started: 0 };
+  const nowMs = Date.now();
+  const warn = (m: string) => warnings.push(`Події: ${m}`);
+
+  // Що має бути: евенти з часом на найближчі N днів, які ще не завершились.
+  const { data, error } = await db.rpc('events_in_range', { p_from: now.date, p_to: addDays(now.date, DISCORD_EVENTS_DAYS - 1) });
+  if (error) {
+    warn(`events_in_range: ${error.message}`);
+    return res;
+  }
+  const desired = new Map<string, DesiredEvent>();
+  for (const r of (data ?? []) as RangeRow[]) {
+    if (!r.start_time) continue;
+    const start = kyivToUtc(r.event_date, r.start_time);
+    const end = new Date(start.getTime() + (r.duration_minutes ?? DEFAULT_DURATION_MIN) * 60_000);
+    if (end.getTime() <= nowMs) continue;
+    const payload: Record<string, unknown> = {
+      name: r.name.slice(0, 100),
+      privacy_level: 2,
+      entity_type: 3,
+      entity_metadata: { location: DISCORD_EVENT_LOCATION.slice(0, 100) },
+      scheduled_start_time: start.toISOString(),
+      scheduled_end_time: end.toISOString(),
+      description: (r.note?.trim() ?? '').slice(0, 1000),
+    };
+    const key = `${r.id}|${r.event_date}`;
+    desired.set(key, { key, eventId: r.id, date: r.event_date, startMs: start.getTime(), endMs: end.getTime(), payload, hash: await sha256(JSON.stringify(payload)) });
+  }
+
+  const { data: rowsData, error: rowsErr } = await db.from('discord_scheduled_events').select('*');
+  if (rowsErr) {
+    warn(`discord_scheduled_events: ${rowsErr.message}`);
+    return res;
+  }
+  const existing = new Map<string, ScheduledRow>();
+  for (const row of (rowsData ?? []) as ScheduledRow[]) existing.set(`${row.event_id}|${row.event_date}`, row);
+
+  const removeRow = (row: ScheduledRow) => db.from('discord_scheduled_events').delete().match({ event_id: row.event_id, event_date: row.event_date });
+
+  // 1. Зайве: евент вимкнули/видалили/перенесли — прибираємо подію; минулі —
+  //    лише рядок (Discord сам завершує події за scheduled_end_time).
+  for (const [key, row] of existing) {
+    if (desired.has(key)) continue;
+    if (new Date(row.ends_at).getTime() > nowMs) {
+      const r = await discord('DELETE', guildEventsUrl(row.discord_event_id), undefined, botHeaders());
+      if (r.status === 429) {
+        warn('ліміт запитів Discord, решта — на наступному запуску');
+        return res;
+      }
+      if (!r.ok && r.status !== 404) {
+        warn(`не вдалося видалити подію ${row.discord_event_id} (${r.status})`);
+        continue;
+      }
+      res.deleted++;
+    }
+    await removeRow(row);
+    existing.delete(key);
+  }
+
+  // 2. Створити нові / оновити змінені.
+  for (const d of desired.values()) {
+    let row = existing.get(d.key);
+    const startPassed = d.startMs <= nowMs;
+
+    if (row && row.content_hash !== d.hash && !startPassed) {
+      const r = await discord('PATCH', guildEventsUrl(row.discord_event_id), d.payload, botHeaders());
+      if (r.status === 429) {
+        warn('ліміт запитів Discord, решта — на наступному запуску');
+        return res;
+      }
+      if (r.status === 404) {
+        await removeRow(row); // видалили руками — створимо знову
+        existing.delete(d.key);
+        row = undefined;
+      } else {
+        if (r.ok) res.updated++;
+        else warn(`«${d.payload.name}» ${dateLabel(d.date)}: не вдалося оновити (${r.status} ${(await r.text().catch(() => '')).slice(0, 150)})`);
+        // хеш зберігаємо і при помилці — інакше та сама невдала правка
+        // повторюватиметься кожні 5 хв.
+        await db.from('discord_scheduled_events')
+          .update({ content_hash: d.hash, starts_at: new Date(d.startMs).toISOString(), ends_at: new Date(d.endMs).toISOString(), updated_at: new Date().toISOString() })
+          .match({ event_id: d.eventId, event_date: d.date });
+      }
+    }
+
+    if (!row) {
+      if (startPassed) continue; // Discord не створює подію з початком у минулому
+      const r = await discord('POST', guildEventsUrl(), d.payload, botHeaders());
+      if (r.status === 429) {
+        warn('ліміт запитів Discord, решта — на наступному запуску');
+        return res;
+      }
+      if (!r.ok) {
+        warn(`«${d.payload.name}» ${dateLabel(d.date)}: не вдалося створити (${r.status} ${(await r.text().catch(() => '')).slice(0, 150)})`);
+        continue;
+      }
+      const ev = (await r.json()) as { id: string };
+      const fresh: ScheduledRow = {
+        event_id: d.eventId,
+        event_date: d.date,
+        discord_event_id: ev.id,
+        content_hash: d.hash,
+        starts_at: new Date(d.startMs).toISOString(),
+        ends_at: new Date(d.endMs).toISOString(),
+        started: false,
+      };
+      await db.from('discord_scheduled_events').upsert({ ...fresh, updated_at: new Date().toISOString() });
+      existing.set(d.key, fresh);
+      res.created++;
+    }
+  }
+
+  // 3. Час настав — переводимо подію в «активна» (один раз). 400 = Discord
+  //    уже сам її стартував/завершив — теж вважаємо зробленим.
+  for (const [key, row] of existing) {
+    const d = desired.get(key);
+    if (!d || row.started || d.startMs > nowMs || d.endMs <= nowMs) continue;
+    const r = await discord('PATCH', guildEventsUrl(row.discord_event_id), { status: 2 }, botHeaders());
+    if (r.status === 429) {
+      warn('ліміт запитів Discord, решта — на наступному запуску');
+      return res;
+    }
+    if (r.ok || r.status === 400 || r.status === 404) {
+      if (r.ok) res.started++;
+      await db.from('discord_scheduled_events').update({ started: true, updated_at: new Date().toISOString() }).match({ event_id: row.event_id, event_date: row.event_date });
+    } else {
+      warn(`«${d.payload.name}»: не вдалося стартувати подію (${r.status})`);
+    }
+  }
+
+  return res;
+}
+
+// ---------------------------------------------------------
 // Синхронізація.
 // ---------------------------------------------------------
 
@@ -307,6 +519,8 @@ interface SyncResult {
   messageId: string;
   pings: string[];
   cleaned: number;
+  /** null — бот/сервер не налаштовані, «Події» не ведуться. */
+  scheduled: ScheduleResult | null;
   warnings: string[];
 }
 
@@ -399,7 +613,10 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
     }
   }
 
-  return { ok: true, date: now.date, time: now.hhmm, events: events.length, post, messageId: messageId!, pings, cleaned, warnings };
+  // 4. «Події» сервера — якщо є бот і ID сервера.
+  const scheduled = await syncScheduledEvents(db, now, warnings);
+
+  return { ok: true, date: now.date, time: now.hhmm, events: events.length, post, messageId: messageId!, pings, cleaned, scheduled, warnings };
 }
 
 // ---------------------------------------------------------
@@ -424,6 +641,7 @@ function todayJson(now: KyivNow, events: EventRow[]) {
       name: e.name,
       time: hhmm(e.start_time),
       note: e.note,
+      durationMinutes: e.start_time ? e.duration_minutes ?? DEFAULT_DURATION_MIN : null,
       pingMinutesBefore: e.start_time ? e.ping_minutes_before : null,
       pingRoleId: e.ping_role_id,
     })),

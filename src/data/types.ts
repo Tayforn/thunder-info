@@ -82,6 +82,8 @@ export interface GuildEvent {
   /** "HH:MM" або null. */
   startTime: string | null;
   note: string | null;
+  /** Тривалість для «Події» Discord, хв; null = 60. */
+  durationMinutes: number | null;
   pingMinutesBefore: number | null;
   /** ID ролі Discord для пінгу; null → DISCORD_PING_ROLE_ID функції або @here. */
   pingRoleId: string | null;
