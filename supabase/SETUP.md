@@ -4,8 +4,11 @@
 
 1. Зареєструйся на [supabase.com](https://supabase.com) (безкоштовно) і створи новий проєкт (напр. `thunder-info`).
 2. У проєкті: **SQL Editor → New query**, встав увесь вміст `migrations/0001_init.sql`, натисни **Run**.
-   Потім так само виконай `migrations/0002_players.sql` (гравці, їх відвідуваність і премії)
-   і `migrations/0003_bonuses_realtime.sql` (realtime для колонки "Премія" на /activity).
+   Потім так само виконай `migrations/0002_players.sql` (гравці, їх відвідуваність і премії),
+   `migrations/0003_bonuses_realtime.sql` (realtime для колонки "Премія" на /activity),
+   `migrations/0004_guild_read_gate.sql` (закриття даних гільдії від анонімів — лише після того, як
+   працює вхід через Discord, див. коментар у файлі) і `migrations/0005_events_discord.sql`
+   (таб «Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)).
    - Якщо рядок `create extension if not exists pg_cron;` впаде через права доступу — увімкни pg_cron вручну через
      **Dashboard → Database → Extensions**, потім запусти міграцію ще раз (вона ідемпотентна, `create table if not exists` і `on conflict do nothing` не зашкодять).
 3. **Project Settings → API** — скопіюй `Project URL` і `anon public` ключ у `.env.local`:

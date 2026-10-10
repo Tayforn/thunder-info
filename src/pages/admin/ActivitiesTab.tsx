@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
+import WeekdayPicker from '../../components/WeekdayPicker';
 import { createActivity, deleteActivity, fetchActivities, updateActivity } from '../../data/activities';
 import type { Activity } from '../../data/types';
-import { WEEKDAY_LABELS } from '../../data/types';
 
 const COLUMNS = '1fr 100px 1fr 90px';
 
@@ -27,28 +27,6 @@ function PointsInput({ initial, onSave }: { initial: number; onSave: (v: number)
         if (!Number.isNaN(n) && n !== initial) onSave(n);
       }}
     />
-  );
-}
-
-function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: number[]) => void }) {
-  const toggle = (d: number) => {
-    const next = value.includes(d) ? value.filter((x) => x !== d) : [...value, d].sort();
-    onChange(next);
-  };
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {WEEKDAY_LABELS.map((label, d) => (
-        <button
-          key={d}
-          type="button"
-          className={'btn btn-sm ' + (value.includes(d) ? 'btn-primary' : 'btn-ghost')}
-          style={{ padding: '4px 9px', fontSize: 12 }}
-          onClick={() => toggle(d)}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
   );
 }
 

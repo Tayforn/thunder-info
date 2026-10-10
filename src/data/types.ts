@@ -66,6 +66,29 @@ export interface Activity {
   sortOrder: number;
 }
 
+/** Евент для поста в Discord (таб "Евенти" в адмінці). Стартово
+ * підтягується з activities (activityId — зв'язок із джерелом), далі
+ * редагується незалежно. eventDate (разовий евент) має пріоритет над
+ * weekdays; startTime — "HH:MM" за Києвом або null ("без часу");
+ * pingMinutesBefore null — не пінгувати. */
+export interface GuildEvent {
+  id: string;
+  activityId: string | null;
+  name: string;
+  /** 0=неділя..6=субота — щотижневі дні (ігноруються, якщо є eventDate). */
+  weekdays: number[];
+  /** YYYY-MM-DD — разовий евент на конкретну дату. */
+  eventDate: string | null;
+  /** "HH:MM" або null. */
+  startTime: string | null;
+  note: string | null;
+  pingMinutesBefore: number | null;
+  /** ID ролі Discord для пінгу; null → DISCORD_PING_ROLE_ID функції або @here. */
+  pingRoleId: string | null;
+  enabled: boolean;
+  sortOrder: number;
+}
+
 export interface GearItem {
   id: string;
   name: string;

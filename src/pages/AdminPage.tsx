@@ -1,7 +1,7 @@
 // =========================================================
-// /admin — 6 табів: п'ять "табличних" CRUD-панелей (AdminTable) —
-// Новачки, Гравці, Ціна лута, Активності, Приоритетність класів — і
-// «Доступ»: хто входив через Discord, з баном/розбаном.
+// /admin — 7 табів: шість "табличних" CRUD-панелей (AdminTable) —
+// Новачки, Гравці, Ціна лута, Активності, Евенти, Приоритетність класів —
+// і «Доступ»: хто входив через Discord, з баном/розбаном.
 // =========================================================
 
 import { useState } from 'react';
@@ -13,16 +13,18 @@ import NewbiesTab from './admin/NewbiesTab';
 import PlayersTab from './admin/PlayersTab';
 import LootPricesTab from './admin/LootPricesTab';
 import ActivitiesTab from './admin/ActivitiesTab';
+import EventsTab from './admin/EventsTab';
 import ClassPriorityTab from './admin/ClassPriorityTab';
 import AccessTab from './admin/AccessTab';
 
-type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'classes' | 'access';
+type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'events' | 'classes' | 'access';
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'newbies', label: 'Новачки' },
   { name: 'players', label: 'Гравці' },
   { name: 'loot', label: 'Ціна лута' },
   { name: 'activities', label: 'Активності' },
+  { name: 'events', label: 'Евенти' },
   { name: 'classes', label: 'Приоритетність класів' },
   { name: 'access', label: 'Доступ' },
 ];
@@ -71,6 +73,7 @@ function AdminTabs() {
       {tab === 'players' && <PlayersTab />}
       {tab === 'loot' && <LootPricesTab />}
       {tab === 'activities' && <ActivitiesTab />}
+      {tab === 'events' && <EventsTab />}
       {tab === 'classes' && <ClassPriorityTab />}
       {tab === 'access' && <AccessTab />}
     </div>

@@ -351,10 +351,10 @@ html[data-theme="light"] .theme-ico-moon { display: inline; }
 .rowlist-row input, .rowlist-row select, .rowlist-row textarea { min-width: 0; }
 .field label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
 .field input[type='number'], .field input[type='text'], .field input[type='email'],
-.field input[type='password'], .field input[type='date'], .field input[type='url'],
+.field input[type='password'], .field input[type='date'], .field input[type='time'], .field input[type='url'],
 .field select, .field textarea,
 .rowlist-row input[type='number'], .rowlist-row input[type='text'], .rowlist-row input[type='email'],
-.rowlist-row input[type='password'], .rowlist-row input[type='date'], .rowlist-row input[type='url'],
+.rowlist-row input[type='password'], .rowlist-row input[type='date'], .rowlist-row input[type='time'], .rowlist-row input[type='url'],
 .rowlist-row select, .rowlist-row textarea {
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--line-2);
