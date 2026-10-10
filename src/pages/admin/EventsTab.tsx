@@ -8,7 +8,7 @@
 // поста і кнопка "Оновити зараз", щоб не чекати крону після правок.
 // =========================================================
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
 import WeekdayPicker from '../../components/WeekdayPicker';
@@ -53,6 +53,30 @@ function TextInput({ initial, placeholder, allowEmpty, onSave }: { initial: stri
       placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => (allowEmpty || value.trim()) && value !== initial && onSave(value)}
+    />
+  );
+}
+
+/** Примітка: кілька рядків, посилання тощо — textarea, що росте під вміст
+ * (до ~160px, далі скрол). Зберігається на blur, як і решта полів. */
+function NoteInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
+  const [value, setValue] = useState(initial);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => setValue(initial), [initial]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      placeholder="Примітка: текст, посилання, кілька рядків (необов'язково)"
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => value !== initial && onSave(value)}
     />
   );
 }
@@ -250,7 +274,7 @@ export default function EventsTab() {
               <li key={e.id}>
                 {e.startTime ? <b>{e.startTime}</b> : <span className="hint">без часу</span>} — {e.name}
                 {e.startTime && e.pingMinutesBefore ? <span className="hint"> · пінг за {e.pingMinutesBefore} хв</span> : null}
-                {e.note ? <span className="hint"> · {e.note}</span> : null}
+                {e.note ? <span className="hint"> · {e.note.split('\n')[0]}{e.note.includes('\n') ? ' …' : ''}</span> : null}
               </li>
             ))}
           </ul>
@@ -281,7 +305,7 @@ export default function EventsTab() {
           return [
             <span key="name" className="cell-stack" style={dim}>
               <TextInput initial={e.name} onSave={(v) => patch(e.id, { name: v })} />
-              <TextInput initial={e.note ?? ''} placeholder="Примітка (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { note: v })} />
+              <NoteInput initial={e.note ?? ''} onSave={(v) => patch(e.id, { note: v })} />
               {activity && <span className="hint cell-note">з активності «{activity.name}»</span>}
             </span>,
             <span key="when" className="cell-stack" style={dim}>

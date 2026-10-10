@@ -253,6 +253,11 @@ interface WebhookPayload {
   allowed_mentions: { parse?: string[]; roles?: string[] };
 }
 
+/** Примітка рядками: порожні — геть, пробіли по краях — геть. */
+function noteLines(note: string | null): string[] {
+  return (note ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+}
+
 /** Посилання на «Подію» сервера (є лише з ботом, див. syncScheduledEvents). */
 function eventUrl(discordEventId: string): string {
   return `https://discord.com/events/${DISCORD_GUILD_ID}/${discordEventId}`;
@@ -268,7 +273,9 @@ function buildPost(now: KyivNow, events: EventRow[], links: Map<string, string>)
     const link = links.get(e.id);
     const name = link ? `[${e.name}](${eventUrl(link)})` : e.name;
     const head = time ? `🕒 **${time}** — ${name}` : `▫️ ${e.name}`;
-    const note = e.note?.trim() ? `\n⠀⠀_${e.note.trim()}_` : '';
+    // примітка — з відступом, кожен рядок окремо; посилання/згадки каналів
+    // Discord рендерить сам
+    const note = noteLines(e.note).map((l) => `\n⠀⠀${l}`).join('');
     return head + note;
   });
   const description = lines.length ? lines.join('\n') : 'Сьогодні евентів немає 😴';
@@ -290,7 +297,7 @@ function buildPing(e: EventRow, minutesLeft: number, discordEventId: string | un
   const mention = roleId ? `<@&${roleId}>` : '@here';
   const time = hhmm(e.start_time) ?? '';
   const when = minutesLeft <= 0 ? 'зараз' : `через ${minutesLeft} хв`;
-  const note = e.note?.trim() ? `\n_${e.note.trim()}_` : '';
+  const note = noteLines(e.note).map((l) => `\n${l}`).join('');
   const link = discordEventId ? `\n${eventUrl(discordEventId)}` : '';
   return {
     content: `${mention} ⏰ ${when} — **${e.name}** (${time})${note}${link}`,

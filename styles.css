@@ -469,6 +469,9 @@ html[data-theme="light"] .theme-ico-moon { display: inline; }
 .events-admin .rowlist-row input[type='date'], .events-admin .rowlist-row input[type='number'] {
   padding: 8px 10px; font-size: 14px;
 }
+.events-admin .rowlist-row textarea {
+  padding: 8px 10px; font-size: 13.5px; line-height: 1.35; min-height: 36px; resize: none; overflow-y: auto;
+}
 .events-admin .cell-stack { display: grid; gap: 6px; align-content: center; min-width: 0; }
 .events-admin .cell-note { font-size: 12px; }
 .events-admin .inline-num { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
