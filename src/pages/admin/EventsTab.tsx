@@ -74,7 +74,8 @@ function NoteInput({ initial, onSave }: { initial: string; onSave: (v: string) =
       ref={ref}
       rows={1}
       value={value}
-      placeholder="Примітка: текст, посилання, кілька рядків (необов'язково)"
+      placeholder="Примітка, посилання… (необов'язково)"
+      title="Можна кілька рядків і посилання — у пості йде під евентом, у «Події» — як опис"
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => value !== initial && onSave(value)}
     />
