@@ -1,31 +1,29 @@
 // =========================================================
-// /admin — 7 табів: шість "табличних" CRUD-панелей (AdminTable) —
-// Новачки, Гравці, Ціна лута, Активності, Евенти, Приоритетність класів —
-// і «Доступ»: хто входив через Discord, з баном/розбаном.
-// Адмін з роллю 'events' (міграція 0008) бачить лише «Евенти».
+// /admin — 6 табів: п'ять "табличних" CRUD-панелей (AdminTable) —
+// Новачки, Гравці, Ціна лута, Активності, Приоритетність класів — і
+// «Доступ»: хто входив через Discord, з баном/розбаном. Евенти для Discord —
+// окрема сторінка /events («ДС Евенти»), доступна й адмінам з роллю 'events'.
 // =========================================================
 
 import { useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import { supabase } from '../app/supabaseClient';
-import { useAuth, type AdminRole } from '../app/useAuth';
+import { useAuth } from '../app/useAuth';
 import AdminGate from '../components/AdminGate';
 import NewbiesTab from './admin/NewbiesTab';
 import PlayersTab from './admin/PlayersTab';
 import LootPricesTab from './admin/LootPricesTab';
 import ActivitiesTab from './admin/ActivitiesTab';
-import EventsTab from './admin/EventsTab';
 import ClassPriorityTab from './admin/ClassPriorityTab';
 import AccessTab from './admin/AccessTab';
 
-type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'events' | 'classes' | 'access';
+type TabName = 'newbies' | 'players' | 'loot' | 'activities' | 'classes' | 'access';
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'newbies', label: 'Новачки' },
   { name: 'players', label: 'Гравці' },
   { name: 'loot', label: 'Ціна лута' },
   { name: 'activities', label: 'Активності' },
-  { name: 'events', label: 'Евенти' },
   { name: 'classes', label: 'Приоритетність класів' },
   { name: 'access', label: 'Доступ' },
 ];
@@ -34,16 +32,15 @@ const TABS: { name: TabName; label: string }[] = [
 // F5) — ключ у localStorage, той самий підхід, що thunder-theme у Header.
 const TAB_STORAGE_KEY = 'thunder-admin-tab';
 
-function AdminTabs({ role }: { role: AdminRole }) {
-  const tabs = role === 'events' ? TABS.filter((t) => t.name === 'events') : TABS;
+function AdminTabs() {
   const [tab, setTab] = useState<TabName>(() => {
     try {
       const saved = localStorage.getItem(TAB_STORAGE_KEY);
-      if (tabs.some((t) => t.name === saved)) return saved as TabName;
+      if (TABS.some((t) => t.name === saved)) return saved as TabName;
     } catch {
       /* ignore */
     }
-    return tabs[0].name;
+    return 'newbies';
   });
 
   const selectTab = (t: TabName) => {
@@ -58,7 +55,7 @@ function AdminTabs({ role }: { role: AdminRole }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 24 }} role="tablist" aria-label="Адмін-таби">
-        {tabs.map((t) => (
+        {TABS.map((t) => (
           <button
             key={t.name}
             type="button"
@@ -75,7 +72,6 @@ function AdminTabs({ role }: { role: AdminRole }) {
       {tab === 'players' && <PlayersTab />}
       {tab === 'loot' && <LootPricesTab />}
       {tab === 'activities' && <ActivitiesTab />}
-      {tab === 'events' && <EventsTab />}
       {tab === 'classes' && <ClassPriorityTab />}
       {tab === 'access' && <AccessTab />}
     </div>
@@ -83,7 +79,7 @@ function AdminTabs({ role }: { role: AdminRole }) {
 }
 
 export default function AdminPage() {
-  const { session, role } = useAuth();
+  const { session } = useAuth();
   return (
     <div>
       <PageMeta title="Адмінка — Thunder" />
@@ -94,7 +90,7 @@ export default function AdminPage() {
         </div>
         {session && <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>}
       </div>
-      <AdminGate allow="events">{() => <AdminTabs role={role ?? 'admin'} />}</AdminGate>
+      <AdminGate>{() => <AdminTabs />}</AdminGate>
     </div>
   );
 }

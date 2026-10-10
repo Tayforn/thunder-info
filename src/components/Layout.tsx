@@ -21,6 +21,7 @@ import NewbiesPage from '../pages/NewbiesPage';
 import PlayersPage from '../pages/PlayersPage';
 import ActivityPage from '../pages/ActivityPage';
 import R8Page from '../pages/R8Page';
+import DsEventsPage from '../pages/DsEventsPage';
 import AdminPage from '../pages/AdminPage';
 
 const isMobile = () => window.matchMedia('(max-width: 880px)').matches;
@@ -81,6 +82,7 @@ export default function Layout() {
   else if (route.name === 'players') page = <PlayersPage />;
   else if (route.name === 'activity') page = <ActivityPage />;
   else if (route.name === 'r8') page = <R8Page />;
+  else if (route.name === 'events') page = <DsEventsPage />;
   else if (route.name === 'admin') page = <AdminPage />;
 
   // Розділи для учасників клану: поки авторизація перевіряється — нічого не

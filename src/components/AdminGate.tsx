@@ -4,14 +4,14 @@
 // AdminPage.tsx, бо тут він потрібен трьом сторінкам, а не одній.
 //
 // allow: 'admin' (за замовчуванням) — лише повні адміни; 'events' — і адміни
-// евентів (role = 'events', міграція 0008) — для /admin, де вони бачать
-// лише таб «Евенти».
+// евентів (role = 'events', міграція 0008) — для сторінки «ДС Евенти».
+// children отримують сесію і роль уже після перевірки — без миготіння.
 // =========================================================
 
 import { useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../app/supabaseClient';
-import { useAuth } from '../app/useAuth';
+import { useAuth, type AdminRole } from '../app/useAuth';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -50,7 +50,7 @@ function LoginForm() {
   );
 }
 
-export default function AdminGate({ allow = 'admin', children }: { allow?: 'admin' | 'events'; children: (session: Session) => ReactNode }) {
+export default function AdminGate({ allow = 'admin', children }: { allow?: 'admin' | 'events'; children: (session: Session, role: AdminRole) => ReactNode }) {
   const { session, role, loading } = useAuth();
 
   if (loading) return <p className="hint">Перевірка сесії…</p>;
@@ -58,9 +58,9 @@ export default function AdminGate({ allow = 'admin', children }: { allow?: 'admi
   if (role === 'events' && allow === 'admin') {
     return (
       <div className="card">
-        <p>Цей акаунт має доступ лише до розділу «Евенти» в адмінці.</p>
+        <p>Цей акаунт має доступ лише до розділу «ДС Евенти».</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-primary" data-goto="admin">До евентів</button>
+          <button type="button" className="btn btn-primary" data-goto="events">До евентів</button>
           <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>
         </div>
       </div>
@@ -75,5 +75,5 @@ export default function AdminGate({ allow = 'admin', children }: { allow?: 'admi
     );
   }
 
-  return <>{children(session)}</>;
+  return <>{children(session, role)}</>;
 }

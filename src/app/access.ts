@@ -6,7 +6,7 @@
 //    лише перегляд, без редагування;
 //  * admin  — адміністратор (окремий вхід Supabase), усе як було: перегляд
 //    і редагування. Адмін з роллю 'events' (міграція 0008) з адмінських
-//    розділів бачить лише /admin (і там — лише таб «Евенти»).
+//    розділів бачить лише /events («ДС Евенти»).
 //
 // Це UI-частина; самі дані закритих розділів недоступні без сесії й на
 // сервері (бекенд-проксі /api/sb + відкликані права anon у базі).
@@ -23,6 +23,7 @@ export const ROUTE_ACCESS: Record<Route['name'], AccessLevel> = {
   players: 'member',
   activity: 'admin',
   r8: 'admin',
+  events: 'admin',
   admin: 'admin',
 };
 
@@ -38,6 +39,6 @@ export interface Viewer {
 export function canOpen(name: Route['name'], v: Viewer): boolean {
   const need = ROUTE_ACCESS[name];
   if (need === 'public') return true;
-  if (need === 'admin') return v.admin || (v.eventsAdmin && name === 'admin');
+  if (need === 'admin') return v.admin || (v.eventsAdmin && name === 'events');
   return v.member || v.admin;
 }

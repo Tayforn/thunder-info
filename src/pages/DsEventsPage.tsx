@@ -1,5 +1,7 @@
 // =========================================================
-// Таб «Евенти»: що саме піде в щоденний пост у Discord. Стартово рядки
+// /events — «ДС Евенти»: що саме піде в щоденний пост у Discord. Окрема
+// сторінка (не таб адмінки), бо її відкривають і адміни з роллю 'events'
+// (міграція 0008), яким решта адмінки закрита. Стартово рядки
 // підтягуються з «Активностей» (тригер у БД + імпорт у міграції 0005),
 // але далі живуть окремо: можна правити назву/дні, додавати час початку,
 // разові евенти на дату, примітку і пінг за N хв до початку.
@@ -14,9 +16,13 @@
 // =========================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { errorMessage, reportError } from '../../app/errorMessage';
-import WeekdayPicker from '../../components/WeekdayPicker';
-import { fetchActivities } from '../../data/activities';
+import PageMeta from '../app/PageMeta';
+import { errorMessage, reportError } from '../app/errorMessage';
+import { supabase } from '../app/supabaseClient';
+import { useAuth } from '../app/useAuth';
+import AdminGate from '../components/AdminGate';
+import WeekdayPicker from '../components/WeekdayPicker';
+import { fetchActivities } from '../data/activities';
 import {
   activitiesWithoutEvent,
   cleanDiscordPings,
@@ -30,9 +36,9 @@ import {
   triggerDiscordSync,
   updateEvent,
   type DiscordPostState,
-} from '../../data/events';
-import type { Activity, GuildEvent } from '../../data/types';
-import { WEEKDAY_LABELS, WEEKDAY_LABELS_FULL, kyivDateString, todayWeekday } from '../../data/types';
+} from '../data/events';
+import type { Activity, GuildEvent } from '../data/types';
+import { WEEKDAY_LABELS, WEEKDAY_LABELS_FULL, kyivDateString, todayWeekday } from '../data/types';
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -253,10 +259,10 @@ function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: Gu
 }
 
 // ---------------------------------------------------------
-// Таб.
+// Панель (після AdminGate).
 // ---------------------------------------------------------
 
-export default function EventsTab() {
+function EventsPanel() {
   const [events, setEvents] = useState<GuildEvent[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [postState, setPostState] = useState<DiscordPostState | null>(null);
@@ -321,7 +327,6 @@ export default function EventsTab() {
 
   return (
     <div className="events-admin">
-      <h3>Евенти</h3>
       <p className="hint" style={{ marginTop: 0 }}>
         Що піде в щоденний пост у Discord. Нові активності з'являються тут самі; назву, дні, час і пінг можна міняти незалежно
         від «Активностей». Евент із часом і пінгом нагадує в каналі за N хв до початку. Усе за київським часом.
@@ -402,6 +407,23 @@ export default function EventsTab() {
         </div>
       </div>
       {err && <p className="form-err">{err}</p>}
+    </div>
+  );
+}
+
+export default function DsEventsPage() {
+  const { session } = useAuth();
+  return (
+    <div>
+      <PageMeta title="ДС Евенти — Thunder" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="section-head">
+        <div>
+          <span className="eyebrow">Discord</span>
+          <h2>ДС Евенти</h2>
+        </div>
+        {session && <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>}
+      </div>
+      <AdminGate allow="events">{() => <EventsPanel />}</AdminGate>
     </div>
   );
 }

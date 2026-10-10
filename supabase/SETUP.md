@@ -8,7 +8,7 @@
    `migrations/0003_bonuses_realtime.sql` (realtime для колонки "Премія" на /activity),
    `migrations/0004_guild_read_gate.sql` (закриття даних гільдії від анонімів — лише після того, як
    працює вхід через Discord, див. коментар у файлі) і `migrations/0005_events_discord.sql`
-   (таб «Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)),
+   (сторінка «ДС Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)),
    `migrations/0006_stable_sort_order.sql` (стабільний порядок рядків в «Активностях» і «Евентах»),
    `migrations/0007_discord_scheduled_events.sql` (тривалість евента + «Події» Discord),
    `migrations/0008_admin_roles.sql` (роль адміна: повний доступ або лише «Евенти»).
@@ -27,7 +27,7 @@
      select id, email from auth.users where email = 'you@example.com';
      ```
    - Так само додай усіх інших адмінів гільдії. Усі вони повні (role = 'admin').
-   - Адмін лише для «Евентів» (бачить у адмінці один таб, пост у Discord, пінги, «Події»;
+   - Адмін лише для «Евентів» (бачить лише сторінку «ДС Евенти»: пост у Discord, пінги, «Події»;
      решта адмінки, /activity і /r8 закриті):
      ```sql
      insert into admins (user_id, email, role)
