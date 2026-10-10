@@ -219,6 +219,14 @@ function webhookBase(): URL {
   return new URL(DISCORD_WEBHOOK_URL);
 }
 
+/** id вебхука з URL (…/api/webhooks/{id}/{token}) — входить у хеш поста:
+ * змінив вебхук/канал/сервер → хеш інший → PATCH на новий вебхук дає 404 →
+ * створюється новий пост. Без цього однаковий список = «без змін». */
+function webhookId(): string {
+  const m = /\/webhooks\/(\d+)\//.exec(webhookBase().pathname);
+  return m ? m[1] : webhookBase().pathname;
+}
+
 /** POST …?wait=true — повертає створене повідомлення (треба його id). */
 function createUrl(): string {
   const u = webhookBase();
@@ -415,7 +423,9 @@ async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: s
       description: (r.note?.trim() ?? '').slice(0, 1000),
     };
     const key = `${r.id}|${r.event_date}`;
-    desired.set(key, { key, eventId: r.id, date: r.event_date, startMs: start.getTime(), endMs: end.getTime(), payload, hash: await sha256(JSON.stringify(payload)) });
+    // у хеші й id сервера: інший сервер → PATCH старої події дає 404 → створюється нова
+    const hash = await sha256(`${DISCORD_GUILD_ID}|${JSON.stringify(payload)}`);
+    desired.set(key, { key, eventId: r.id, date: r.event_date, startMs: start.getTime(), endMs: end.getTime(), payload, hash });
   }
 
   const { data: rowsData, error: rowsErr } = await db.from('discord_scheduled_events').select('*');
@@ -560,8 +570,9 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
   const links = await loadTodayLinks(db, now.date);
 
   // 1. Пост: один на весь час; щодня (і при кожній зміні списку) редагується.
+  //    У хеші також id вебхука — щоб зміна каналу/сервера не читалась як «без змін».
   const payload = buildPost(now, events, links);
-  const hash = await sha256(JSON.stringify(payload));
+  const hash = await sha256(`${webhookId()}|${JSON.stringify(payload)}`);
   const { data: stateRow, error: stateErr } = await db.from('discord_event_post').select('message_id, channel_id, post_date, content_hash').eq('id', 1).maybeSingle();
   if (stateErr) throw new HttpError(500, `discord_event_post: ${stateErr.message}`);
   const state = (stateRow ?? null) as PostState | null;
