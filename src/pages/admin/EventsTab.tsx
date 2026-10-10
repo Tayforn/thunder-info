@@ -15,6 +15,7 @@ import WeekdayPicker from '../../components/WeekdayPicker';
 import { fetchActivities } from '../../data/activities';
 import {
   activitiesWithoutEvent,
+  cleanDiscordPings,
   createEvent,
   deleteEvent,
   divergedFromActivity,
@@ -25,7 +26,6 @@ import {
   triggerDiscordSync,
   updateEvent,
   type DiscordPostState,
-  type SyncResult,
 } from '../../data/events';
 import type { Activity, GuildEvent } from '../../data/types';
 import { WEEKDAY_LABELS, WEEKDAY_LABELS_FULL, kyivDateString, todayWeekday } from '../../data/types';
@@ -106,25 +106,37 @@ function WhenPicker({ weekdays, eventDate, onChange }: { weekdays: number[]; eve
 }
 
 function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; onSynced: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<SyncResult | null>(null);
+  const [busy, setBusy] = useState<'sync' | 'clean' | null>(null);
+  const [result, setResult] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const sync = async () => {
-    setBusy(true);
+  const postLabel = { created: 'пост створено', edited: 'пост оновлено', unchanged: 'пост без змін' } as const;
+
+  const run = async (what: 'sync' | 'clean') => {
+    setBusy(what);
     setErr(null);
     setResult(null);
     try {
-      setResult(await triggerDiscordSync());
-      onSynced();
+      if (what === 'sync') {
+        const r = await triggerDiscordSync();
+        setResult(
+          `${postLabel[r.post]}, евентів на ${dateLabel(r.date)}: ${r.events}` +
+            (r.pings.length > 0 ? `, пінги: ${r.pings.join(', ')}` : '') +
+            (r.cleaned > 0 ? `, прибрано старих пінгів: ${r.cleaned}` : '') +
+            '.',
+        );
+        onSynced();
+      } else {
+        if (!confirm('Прибрати з каналу всі нагадування (пінги)? Пост лишиться. Сьогоднішні пінги повторно не надсилатимуться.')) return;
+        const r = await cleanDiscordPings();
+        setResult(r.cleaned > 0 ? `Прибрано пінгів: ${r.cleaned}.` : 'Пінгів у каналі немає.');
+      }
     } catch (e) {
-      setErr(errorMessage(e, 'Не вдалося оновити пост у Discord.'));
+      setErr(errorMessage(e, what === 'sync' ? 'Не вдалося оновити пост у Discord.' : 'Не вдалося почистити пінги.'));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
-
-  const postLabel = { created: 'пост створено', edited: 'пост оновлено', unchanged: 'пост без змін' } as const;
 
   return (
     <div className="card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -137,18 +149,17 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
         ) : (
           <div className="hint">Ще не створений — натисни «Оновити зараз» або дочекайся крону (див. supabase/DISCORD.md).</div>
         )}
-        {result && (
-          <div className="hint" style={{ marginTop: 4, color: 'var(--good)' }}>
-            {postLabel[result.post]}, евентів на {dateLabel(result.date)}: {result.events}
-            {result.pings.length > 0 ? `, пінги: ${result.pings.join(', ')}` : ''}
-            {result.cleaned > 0 ? `, прибрано старих пінгів: ${result.cleaned}` : ''}.
-          </div>
-        )}
+        {result && <div className="hint" style={{ marginTop: 4, color: 'var(--good)' }}>{result}</div>}
         {err && <p className="form-err" style={{ marginTop: 4 }}>{err}</p>}
       </div>
-      <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={sync}>
-        {busy ? 'Оновлення…' : 'Оновити зараз'}
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={busy !== null} title="Видалити з каналу всі надіслані нагадування; пост лишається" onClick={() => run('clean')}>
+          {busy === 'clean' ? 'Чищення…' : 'Почистити пінги'}
+        </button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy !== null} onClick={() => run('sync')}>
+          {busy === 'sync' ? 'Оновлення…' : 'Оновити зараз'}
+        </button>
+      </div>
     </div>
   );
 }

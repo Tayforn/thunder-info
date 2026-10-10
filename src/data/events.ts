@@ -186,13 +186,27 @@ export interface SyncResult {
   cleaned: number;
 }
 
+export interface CleanResult {
+  cleaned: number;
+  warnings: string[];
+}
+
 /** Смикнути Edge Function discord-events (POST …/sync) від імені адміна —
  * supabase-js сам підставляє JWT сесії в Authorization, функція перевіряє
  * його і allow-list admins. */
-export async function triggerDiscordSync(): Promise<SyncResult> {
-  const { data, error } = await supabase.functions.invoke<SyncResult>('discord-events/sync', { method: 'POST', body: {} });
+export function triggerDiscordSync(): Promise<SyncResult> {
+  return invokeDiscord<SyncResult>('sync', 'Не вдалося оновити пост у Discord.');
+}
+
+/** Прибрати з каналу всі надіслані пінги (пост лишається). */
+export function cleanDiscordPings(): Promise<CleanResult> {
+  return invokeDiscord<CleanResult>('clean', 'Не вдалося почистити пінги.');
+}
+
+async function invokeDiscord<T>(action: 'sync' | 'clean', fallback: string): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>(`discord-events/${action}`, { method: 'POST', body: {} });
   if (error) {
-    let message = error.message || 'Не вдалося оновити пост у Discord.';
+    let message = error.message || fallback;
     const ctx = (error as { context?: unknown }).context;
     if (ctx instanceof Response) {
       try {

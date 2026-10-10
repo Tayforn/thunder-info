@@ -8,6 +8,8 @@
 //   POST /discord-events/sync     → оновити пост (створити, якщо нема),
 //                                   надіслати пінги за N хв до евентів,
 //                                   прибрати вчорашні пінги з каналу.
+//   POST /discord-events/clean    → прибрати з каналу ВСІ надіслані пінги
+//                                   (і сьогоднішні); пост лишається.
 //
 // Авторизація (будь-який варіант):
 //   * заголовок  x-api-key: <EVENTS_API_KEY>   — крон/скрипти;
@@ -257,6 +259,42 @@ async function pinMessage(channelId: string, messageId: string): Promise<string 
 }
 
 // ---------------------------------------------------------
+// Пінги: видалення повідомлень вебхуком (404 = уже видалено руками).
+// ---------------------------------------------------------
+
+async function deletePingMessages(rows: PingRow[]): Promise<{ cleaned: number; warnings: string[] }> {
+  let cleaned = 0;
+  const warnings: string[] = [];
+  for (const p of rows) {
+    if (!p.message_id) continue;
+    const r = await discord('DELETE', messageUrl(p.message_id));
+    if (r.ok || r.status === 404) cleaned++;
+    else warnings.push(`Не вдалося прибрати пінг ${p.message_id}: ${r.status}`);
+  }
+  return { cleaned, warnings };
+}
+
+interface CleanResult {
+  ok: true;
+  cleaned: number;
+  warnings: string[];
+}
+
+/** Кнопка «Почистити пінги» в адмінці: прибрати з каналу всі нагадування,
+ * включно з сьогоднішніми. Сьогоднішні рядки лишаються (без message_id),
+ * щоб наступний sync не надіслав той самий пінг удруге. */
+async function cleanPings(db: SupabaseClient): Promise<CleanResult> {
+  const now = kyivNow();
+  const { data, error } = await db.from('discord_event_pings').select('event_id, ping_date, message_id');
+  if (error) throw new HttpError(500, `discord_event_pings: ${error.message}`);
+  const rows = (data ?? []) as PingRow[];
+  const del = await deletePingMessages(rows);
+  await db.from('discord_event_pings').delete().lt('ping_date', now.date);
+  await db.from('discord_event_pings').update({ message_id: null }).eq('ping_date', now.date).not('message_id', 'is', null);
+  return { ok: true, cleaned: del.cleaned, warnings: del.warnings };
+}
+
+// ---------------------------------------------------------
 // Синхронізація.
 // ---------------------------------------------------------
 
@@ -327,16 +365,12 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
   }
 
   // 2. Прибрати вчорашні нагадування, щоб у каналі лишався лише пост.
-  let cleaned = 0;
   const { data: oldPings } = await db.from('discord_event_pings').select('event_id, ping_date, message_id').lt('ping_date', now.date);
-  for (const p of (oldPings ?? []) as PingRow[]) {
-    if (p.message_id) {
-      const r = await discord('DELETE', messageUrl(p.message_id));
-      if (!r.ok && r.status !== 404) warnings.push(`Не вдалося прибрати пінг ${p.message_id}: ${r.status}`);
-    }
-    cleaned++;
-  }
-  if (cleaned > 0) await db.from('discord_event_pings').delete().lt('ping_date', now.date);
+  const old = (oldPings ?? []) as PingRow[];
+  const del = await deletePingMessages(old);
+  const cleaned = del.cleaned;
+  warnings.push(...del.warnings);
+  if (old.length > 0) await db.from('discord_event_pings').delete().lt('ping_date', now.date);
 
   // 3. Пінги за N хв до початку (вікно [start - N, start)); один на евент
   //    на день — рядок вставляємо ДО запиту в Discord, щоб паралельний
@@ -404,11 +438,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     await authorize(req, db);
 
     const path = new URL(req.url).pathname.replace(/\/+$/, '');
-    const action = path.endsWith('/sync') ? 'sync' : path.endsWith('/preview') ? 'preview' : 'today';
+    const action = path.endsWith('/sync') ? 'sync' : path.endsWith('/clean') ? 'clean' : path.endsWith('/preview') ? 'preview' : 'today';
 
-    if (action === 'sync') {
-      if (req.method !== 'POST') throw new HttpError(405, 'sync — лише POST.');
-      return json(await sync(db));
+    if (action === 'sync' || action === 'clean') {
+      if (req.method !== 'POST') throw new HttpError(405, `${action} — лише POST.`);
+      return json(action === 'sync' ? await sync(db) : await cleanPings(db));
     }
 
     const now = kyivNow();
