@@ -253,13 +253,21 @@ interface WebhookPayload {
   allowed_mentions: { parse?: string[]; roles?: string[] };
 }
 
+/** Посилання на «Подію» сервера (є лише з ботом, див. syncScheduledEvents). */
+function eventUrl(discordEventId: string): string {
+  return `https://discord.com/events/${DISCORD_GUILD_ID}/${discordEventId}`;
+}
+
 /** Текст щоденного поста. Детермінований (без "оновлено о …"), щоб хеш
- * мінявся лише коли реально змінився список. */
-function buildPost(now: KyivNow, events: EventRow[]): WebhookPayload {
+ * мінявся лише коли реально змінився список. Назва евента з часом —
+ * посилання на «Подію», якщо вона є: клік → «Цікаво». */
+function buildPost(now: KyivNow, events: EventRow[], links: Map<string, string>): WebhookPayload {
   const title = `📅 Евенти на сьогодні — ${WEEKDAYS_FULL[now.weekday]}, ${dateLabel(now.date)}`;
   const lines = events.map((e) => {
     const time = hhmm(e.start_time);
-    const head = time ? `🕒 **${time}** — ${e.name}` : `▫️ ${e.name}`;
+    const link = links.get(e.id);
+    const name = link ? `[${e.name}](${eventUrl(link)})` : e.name;
+    const head = time ? `🕒 **${time}** — ${name}` : `▫️ ${e.name}`;
     const note = e.note?.trim() ? `\n⠀⠀_${e.note.trim()}_` : '';
     return head + note;
   });
@@ -277,14 +285,15 @@ function buildPost(now: KyivNow, events: EventRow[]): WebhookPayload {
   };
 }
 
-function buildPing(e: EventRow, minutesLeft: number): WebhookPayload {
+function buildPing(e: EventRow, minutesLeft: number, discordEventId: string | undefined): WebhookPayload {
   const roleId = e.ping_role_id?.trim() || DISCORD_PING_ROLE_ID || '';
   const mention = roleId ? `<@&${roleId}>` : '@here';
   const time = hhmm(e.start_time) ?? '';
   const when = minutesLeft <= 0 ? 'зараз' : `через ${minutesLeft} хв`;
   const note = e.note?.trim() ? `\n_${e.note.trim()}_` : '';
+  const link = discordEventId ? `\n${eventUrl(discordEventId)}` : '';
   return {
-    content: `${mention} ⏰ ${when} — **${e.name}** (${time})${note}`,
+    content: `${mention} ⏰ ${when} — **${e.name}** (${time})${note}${link}`,
     allowed_mentions: roleId ? { roles: [roleId] } : { parse: ['everyone'] },
   };
 }
@@ -524,13 +533,27 @@ interface SyncResult {
   warnings: string[];
 }
 
+/** id «Подій» Discord для сьогоднішніх евентів (event_id → discord_event_id). */
+async function loadTodayLinks(db: SupabaseClient, date: string): Promise<Map<string, string>> {
+  const links = new Map<string, string>();
+  if (!DISCORD_BOT_TOKEN || !DISCORD_GUILD_ID) return links;
+  const { data } = await db.from('discord_scheduled_events').select('event_id, discord_event_id').eq('event_date', date);
+  for (const r of (data ?? []) as { event_id: string; discord_event_id: string }[]) links.set(r.event_id, r.discord_event_id);
+  return links;
+}
+
 async function sync(db: SupabaseClient): Promise<SyncResult> {
   const now = kyivNow();
   const events = await loadToday(db, now.date);
   const warnings: string[] = [];
 
+  // 0. «Події» сервера (лише з ботом і ID сервера) — першими, щоб у пості
+  //    та пінгах уже були посилання на сьогоднішні.
+  const scheduled = await syncScheduledEvents(db, now, warnings);
+  const links = await loadTodayLinks(db, now.date);
+
   // 1. Пост: один на весь час; щодня (і при кожній зміні списку) редагується.
-  const payload = buildPost(now, events);
+  const payload = buildPost(now, events, links);
   const hash = await sha256(JSON.stringify(payload));
   const { data: stateRow, error: stateErr } = await db.from('discord_event_post').select('message_id, channel_id, post_date, content_hash').eq('id', 1).maybeSingle();
   if (stateErr) throw new HttpError(500, `discord_event_post: ${stateErr.message}`);
@@ -601,7 +624,7 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
     const { error: reserveErr } = await db.from('discord_event_pings').insert({ event_id: e.id, ping_date: now.date });
     if (reserveErr) continue; // уже зарезервовано іншим запуском
 
-    const r = await discord('POST', createUrl(), buildPing(e, start - now.minutes));
+    const r = await discord('POST', createUrl(), buildPing(e, start - now.minutes, links.get(e.id)));
     if (r.ok) {
       const msg = (await r.json()) as { id: string };
       await db.from('discord_event_pings').update({ message_id: msg.id }).match({ event_id: e.id, ping_date: now.date });
@@ -612,9 +635,6 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
       warnings.push(`Пінг «${e.name}»: Discord відповів ${r.status}`);
     }
   }
-
-  // 4. «Події» сервера — якщо є бот і ID сервера.
-  const scheduled = await syncScheduledEvents(db, now, warnings);
 
   return { ok: true, date: now.date, time: now.hhmm, events: events.length, post, messageId: messageId!, pings, cleaned, scheduled, warnings };
 }
@@ -627,7 +647,7 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });
 }
 
-function todayJson(now: KyivNow, events: EventRow[]) {
+function todayJson(now: KyivNow, events: EventRow[], links: Map<string, string>) {
   return {
     ok: true,
     date: now.date,
@@ -644,6 +664,7 @@ function todayJson(now: KyivNow, events: EventRow[]) {
       durationMinutes: e.start_time ? e.duration_minutes ?? DEFAULT_DURATION_MIN : null,
       pingMinutesBefore: e.start_time ? e.ping_minutes_before : null,
       pingRoleId: e.ping_role_id,
+      discordEventUrl: links.has(e.id) ? eventUrl(links.get(e.id)!) : null,
     })),
   };
 }
@@ -665,8 +686,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const now = kyivNow();
     const events = await loadToday(db, now.date);
-    if (action === 'preview') return json({ ok: true, date: now.date, webhook: buildPost(now, events) });
-    return json(todayJson(now, events));
+    const links = await loadTodayLinks(db, now.date);
+    if (action === 'preview') return json({ ok: true, date: now.date, webhook: buildPost(now, events, links) });
+    return json(todayJson(now, events, links));
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     const message = e instanceof Error ? e.message : String(e);

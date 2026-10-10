@@ -173,6 +173,9 @@ select cron.schedule('discord-events-sync', '* * * * *', 'select discord_events_
 - Подія створюється одна на евент на дату; у таблиці `discord_scheduled_events`
   зберігається її id і хеш вмісту. Discord смикається лише коли щось змінилось —
   при кроні кожні 5 хв це зазвичай нуль запитів.
+- У щоденному пості назва евента з часом стає посиланням на подію, а в пінгу
+  посилання йде окремим рядком — Discord показує картку події з кнопкою «Цікаво».
+  Посилання має вигляд `https://discord.com/events/<id сервера>/<id події>`.
 - Тривалість — поле «триває … хв» у табі (порожньо = 60). Discord вимагає час
   завершення, а після нього сам позначає подію завершеною.
 - Коли настає час початку, функція переводить подію в «активна» (на випадок, якщо
@@ -214,13 +217,14 @@ select cron.schedule('discord-events-sync', '* * * * *', 'select discord_events_
   "timezone": "Europe/Kyiv",
   "now": "12:40",
   "events": [
-    { "id": "…", "name": "ТВ", "time": "20:00", "note": "збір біля Міста Драконів", "durationMinutes": 60, "pingMinutesBefore": 15, "pingRoleId": null },
-    { "id": "…", "name": "КХ", "time": null, "note": null, "durationMinutes": null, "pingMinutesBefore": null, "pingRoleId": null }
+    { "id": "…", "name": "ТВ", "time": "20:00", "note": "збір біля Міста Драконів", "durationMinutes": 60, "pingMinutesBefore": 15, "pingRoleId": null, "discordEventUrl": "https://discord.com/events/…/…" },
+    { "id": "…", "name": "КХ", "time": null, "note": null, "durationMinutes": null, "pingMinutesBefore": null, "pingRoleId": null, "discordEventUrl": null }
   ]
 }
 ```
 
-Порядок: спочатку евенти з часом (за часом), потім без часу. `time` — `"HH:MM"` або `null`.
+Порядок: спочатку евенти з часом (за часом), потім без часу. `time` — `"HH:MM"` або `null`;
+`discordEventUrl` — посилання на «Подію» сервера, якщо вона є (крок 6), інакше `null`.
 
 `POST /discord-events/sync`:
 
