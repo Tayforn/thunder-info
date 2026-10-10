@@ -81,11 +81,11 @@ supabase functions deploy discord-events --no-verify-jwt
   Нові значення функція бачить без повторного деплою.
 - **Автодеплой з GitHub.** Воркфлоу `.github/workflows/deploy-functions.yml` сам
   деплоїть функцію при кожному пуші в `main`, що зачіпає `supabase/functions/**`
-  (і вручну: Actions → Deploy Edge Functions → Run workflow). Потрібні два секрети
+  (і вручну: Actions → Deploy Edge Functions → Run workflow). Потрібен один секрет
   репозиторію (Settings → Secrets and variables → Actions → New repository secret):
-  `SUPABASE_ACCESS_TOKEN` (Supabase Dashboard → аватар → Account → **Access Tokens** →
-  Generate new token) і `SUPABASE_PROJECT_REF` (`<ref>` з URL проєкту). Після цього
-  ручний `supabase functions deploy` більше не потрібен.
+  `SUPABASE_ACCESS_TOKEN` — Supabase Dashboard → аватар → Account → **Access Tokens** →
+  Generate new token. `<ref>` проєкту воркфлоу бере з наявного `VITE_SUPABASE_URL`.
+  Після цього ручний `supabase functions deploy` більше не потрібен.
 
 Перевірка:
 
