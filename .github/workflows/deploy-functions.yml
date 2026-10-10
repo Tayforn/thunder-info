@@ -1,0 +1,38 @@
+# Деплой Supabase Edge Functions при пуші в main (якщо змінились файли функцій)
+# або вручну (Actions → Deploy Edge Functions → Run workflow).
+#
+# Потрібні два секрети репозиторію (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN — Supabase Dashboard → Account (аватар) → Access Tokens → Generate;
+#   SUPABASE_PROJECT_REF  — <ref> з URL проєкту https://<ref>.supabase.co.
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**', '.github/workflows/deploy-functions.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: supabase functions deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy discord-events
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "::error::Немає секрету SUPABASE_ACCESS_TOKEN (див. коментар у workflow)"; exit 1; }
+          test -n "$SUPABASE_PROJECT_REF" || { echo "::error::Немає секрету SUPABASE_PROJECT_REF (див. коментар у workflow)"; exit 1; }
+          supabase functions deploy discord-events --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"

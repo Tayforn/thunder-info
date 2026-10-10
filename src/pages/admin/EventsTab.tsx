@@ -5,12 +5,16 @@
 // разові евенти на дату, примітку і пінг за N хв до початку.
 //
 // Пост веде Edge Function discord-events (крон кожні 5 хв). Тут — стан
-// поста і кнопка "Оновити зараз", щоб не чекати крону після правок.
+// поста і кнопки "Оновити зараз" / "Почистити пінги", щоб не чекати крону.
+//
+// Верстка рядка — три лінії (не AdminTable: полів забагато для колонок):
+//   1) назва + «коли» (щотижня/дата, дні);
+//   2) час · пінг · тривалість · роль · увімк. · дії;
+//   3) примітка на всю ширину (кілька рядків, посилання).
 // =========================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
-import AdminTable from '../../components/AdminTable';
 import WeekdayPicker from '../../components/WeekdayPicker';
 import { fetchActivities } from '../../data/activities';
 import {
@@ -30,8 +34,6 @@ import {
 import type { Activity, GuildEvent } from '../../data/types';
 import { WEEKDAY_LABELS, WEEKDAY_LABELS_FULL, kyivDateString, todayWeekday } from '../../data/types';
 
-const COLUMNS = '1.2fr 300px 180px 180px 60px 150px';
-
 function when(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' });
@@ -43,12 +45,17 @@ function dateLabel(ymd: string): string {
   return `${d}.${m}.${y}`;
 }
 
-function TextInput({ initial, placeholder, allowEmpty, onSave }: { initial: string; placeholder?: string; allowEmpty?: boolean; onSave: (v: string) => void }) {
+// ---------------------------------------------------------
+// Поля з локальним станом і збереженням на blur (як в інших табах).
+// ---------------------------------------------------------
+
+function TextInput({ initial, placeholder, allowEmpty, className, onSave }: { initial: string; placeholder?: string; allowEmpty?: boolean; className?: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   useEffect(() => setValue(initial), [initial]);
   return (
     <input
       type="text"
+      className={className}
       value={value}
       placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}
@@ -58,7 +65,7 @@ function TextInput({ initial, placeholder, allowEmpty, onSave }: { initial: stri
 }
 
 /** Примітка: кілька рядків, посилання тощо — textarea, що росте під вміст
- * (до ~160px, далі скрол). Зберігається на blur, як і решта полів. */
+ * (до ~160px, далі скрол). */
 function NoteInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -74,8 +81,7 @@ function NoteInput({ initial, onSave }: { initial: string; onSave: (v: string) =
       ref={ref}
       rows={1}
       value={value}
-      placeholder="Примітка, посилання… (необов'язково)"
-      title="Можна кілька рядків і посилання — у пості йде під евентом, у «Події» — як опис"
+      placeholder="Примітка: текст, посилання, кілька рядків — у пості йде під евентом, у «Події» — як опис (необов'язково)"
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => value !== initial && onSave(value)}
     />
@@ -106,18 +112,18 @@ function MinutesInput({ initial, min, max, placeholder, onSave }: { initial: num
   return <input type="number" min={min} max={max} value={value} placeholder={placeholder ?? '—'} onChange={(e) => setValue(e.target.value)} onBlur={commit} />;
 }
 
-/** "Коли": щотижня (дні тижня) або разово (дата). Дата має пріоритет —
- * перемикання на "Дата" ставить сьогоднішню, повернення на "Щотижня"
- * прибирає дату (дні тижня лишаються як були). */
+/** "Коли": щотижня (дні тижня) або разово (дата) — в одну лінію. Дата має
+ * пріоритет: перемикання на "Дата" ставить сьогоднішню, повернення на
+ * "Щотижня" прибирає дату (дні тижня лишаються як були). */
 function WhenPicker({ weekdays, eventDate, onChange }: { weekdays: number[]; eventDate: string | null; onChange: (patch: { weekdays?: number[]; eventDate?: string | null }) => void }) {
   const dated = eventDate !== null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button type="button" className={'btn btn-sm ' + (!dated ? 'btn-primary' : 'btn-ghost')} style={{ padding: '3px 9px', fontSize: 12 }} onClick={() => dated && onChange({ eventDate: null })}>
+    <div className="event-when">
+      <div className="event-when-mode">
+        <button type="button" className={'btn btn-sm ' + (!dated ? 'btn-primary' : 'btn-ghost')} onClick={() => dated && onChange({ eventDate: null })}>
           Щотижня
         </button>
-        <button type="button" className={'btn btn-sm ' + (dated ? 'btn-primary' : 'btn-ghost')} style={{ padding: '3px 9px', fontSize: 12 }} onClick={() => !dated && onChange({ eventDate: kyivDateString() })}>
+        <button type="button" className={'btn btn-sm ' + (dated ? 'btn-primary' : 'btn-ghost')} onClick={() => !dated && onChange({ eventDate: kyivDateString() })}>
           Дата
         </button>
       </div>
@@ -129,6 +135,10 @@ function WhenPicker({ weekdays, eventDate, onChange }: { weekdays: number[]; eve
     </div>
   );
 }
+
+// ---------------------------------------------------------
+// Блок стану поста в Discord.
+// ---------------------------------------------------------
 
 function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; onSynced: () => void }) {
   const [busy, setBusy] = useState<'sync' | 'clean' | null>(null);
@@ -167,7 +177,7 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
   };
 
   return (
-    <div className="card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className="card events-card">
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Пост у Discord</div>
         {state ? (
@@ -191,6 +201,60 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
     </div>
   );
 }
+
+// ---------------------------------------------------------
+// Рядок евента.
+// ---------------------------------------------------------
+
+type Patch = Parameters<typeof updateEvent>[1];
+
+function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: GuildEvent; activity: Activity | undefined; onPatch: (p: Patch) => void; onPull: () => void; onDelete: () => void }) {
+  const diverged = divergedFromActivity(e, activity);
+  return (
+    <div className={'rowlist-row event-row' + (e.enabled ? '' : ' off')}>
+      <div className="event-line">
+        <TextInput className="event-name" initial={e.name} onSave={(v) => onPatch({ name: v })} />
+        <WhenPicker weekdays={e.weekdays} eventDate={e.eventDate} onChange={onPatch} />
+      </div>
+
+      <div className="event-line">
+        <label className="ctl" title="Час початку за Києвом; порожньо = без часу (у пості без години, без пінгу й «Події»)">
+          час <TimeInput initial={e.startTime} onSave={(v) => onPatch({ startTime: v })} />
+        </label>
+        <label className="ctl" title="За скільки хвилин до початку пінгнути роль у каналі; порожньо = не пінгувати">
+          пінг за <MinutesInput initial={e.pingMinutesBefore} min={1} max={180} onSave={(v) => onPatch({ pingMinutesBefore: v })} /> хв
+        </label>
+        <label className="ctl" title="Тривалість для «Події» Discord; порожньо = 60 хв">
+          триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => onPatch({ durationMinutes: v })} /> хв
+        </label>
+        <label className="ctl" title="ID ролі Discord для пінгу; порожньо = роль за замовчуванням із секретів або @here">
+          роль <TextInput className="ctl-role" initial={e.pingRoleId ?? ''} placeholder="ID ролі" allowEmpty onSave={(v) => onPatch({ pingRoleId: v })} />
+        </label>
+        <label className="ctl ctl-on" title={e.enabled ? 'Увімкнено — потрапляє в пост і «Події»' : 'Вимкнено — у пост не потрапляє'}>
+          <input type="checkbox" checked={e.enabled} onChange={(ev) => onPatch({ enabled: ev.target.checked })} /> увімк.
+        </label>
+        <div className="event-actions">
+          {activity && !diverged && <span className="hint event-src">з активності «{activity.name}»</span>}
+          {diverged && activity && (
+            <button type="button" className="btn btn-ghost btn-sm" title={`Підтягнути назву і дні з активності «${activity.name}» (${activity.weekdays.map((d) => WEEKDAY_LABELS[d]).join(', ') || 'без днів'})`} onClick={onPull}>
+              ↻ з активності
+            </button>
+          )}
+          <button type="button" className="btn btn-bad btn-sm" onClick={() => confirm(`Видалити евент «${e.name}»?`) && onDelete()}>
+            Видалити
+          </button>
+        </div>
+      </div>
+
+      <NoteInput initial={e.note ?? ''} onSave={(v) => onPatch({ note: v })} />
+      {!e.eventDate && e.weekdays.length === 0 && <span className="hint event-warn">Дні не вибрано — у пост не потрапить.</span>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------
+// Таб.
+// ---------------------------------------------------------
 
 export default function EventsTab() {
   const [events, setEvents] = useState<GuildEvent[]>([]);
@@ -247,7 +311,7 @@ export default function EventsTab() {
     }
   };
 
-  const patch = (id: string, p: Parameters<typeof updateEvent>[1]) => updateEvent(id, p).then(reload).catch(reportError);
+  const patch = (id: string, p: Patch) => updateEvent(id, p).then(reload).catch(reportError);
 
   const pullFromActivity = (e: GuildEvent) => {
     const a = e.activityId ? activityById.get(e.activityId) : undefined;
@@ -265,7 +329,7 @@ export default function EventsTab() {
 
       <DiscordStatus state={postState} onSynced={() => fetchDiscordPostState().then(setPostState).catch(() => undefined)} />
 
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 18 }}>
+      <div className="card events-card" style={{ display: 'block' }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Сьогодні в пості — {todayLabel}</div>
         {today.length === 0 ? (
           <div className="hint">Сьогодні евентів немає.</div>
@@ -283,7 +347,7 @@ export default function EventsTab() {
       </div>
 
       {missing.length > 0 && (
-        <div className="card" style={{ padding: '14px 20px', marginBottom: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card events-card">
           <div className="hint">
             Активності без евента: <b>{missing.map((a) => a.name).join(', ')}</b>
           </div>
@@ -293,80 +357,50 @@ export default function EventsTab() {
         </div>
       )}
 
-      <AdminTable
-        columns={COLUMNS}
-        header={['Назва · примітка', 'Коли', 'Час · роль для пінгу', 'Пінг · тривалість', 'Увімк.', '']}
-        rows={events}
-        keyFn={(e) => e.id}
-        emptyLabel="Евентів ще немає — додай нижче або підтягни з активностей."
-        renderRow={(e) => {
-          const activity = e.activityId ? activityById.get(e.activityId) : undefined;
-          const diverged = divergedFromActivity(e, activity);
-          const dim = { opacity: e.enabled ? 1 : 0.55 };
-          return [
-            <span key="name" className="cell-stack" style={dim}>
-              <TextInput initial={e.name} onSave={(v) => patch(e.id, { name: v })} />
-              <NoteInput initial={e.note ?? ''} onSave={(v) => patch(e.id, { note: v })} />
-              {activity && <span className="hint cell-note">з активності «{activity.name}»</span>}
-            </span>,
-            <span key="when" className="cell-stack" style={dim}>
-              <WhenPicker weekdays={e.weekdays} eventDate={e.eventDate} onChange={(p) => patch(e.id, p)} />
-              {!e.eventDate && e.weekdays.length === 0 && <span className="hint cell-note">дні не вибрано — у пост не потрапить</span>}
-            </span>,
-            <span key="time" className="cell-stack" style={dim}>
-              <TimeInput initial={e.startTime} onSave={(v) => patch(e.id, { startTime: v })} />
-              <TextInput initial={e.pingRoleId ?? ''} placeholder="ID ролі (необов'язково)" allowEmpty onSave={(v) => patch(e.id, { pingRoleId: v })} />
-            </span>,
-            <span key="ping" className="cell-stack" style={dim}>
-              <span className="inline-num hint" title="За скільки хвилин до початку пінгнути роль у каналі; порожньо = не пінгувати">
-                пінг за <MinutesInput initial={e.pingMinutesBefore} min={1} max={180} onSave={(v) => patch(e.id, { pingMinutesBefore: v })} /> хв
-              </span>
-              <span className="inline-num hint" title="Тривалість для «Події» Discord; порожньо = 60 хв">
-                триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => patch(e.id, { durationMinutes: v })} /> хв
-              </span>
-            </span>,
-            <input key="on" type="checkbox" checked={e.enabled} title={e.enabled ? 'Увімкнено — потрапляє в пост' : 'Вимкнено — у пост не потрапляє'} onChange={(ev) => patch(e.id, { enabled: ev.target.checked })} style={{ accentColor: 'var(--accent)', width: 18, height: 18, cursor: 'pointer' }} />,
-            <span key="actions" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {diverged && activity && (
-                <button type="button" className="btn btn-ghost btn-sm" title={`Підтягнути назву і дні з активності «${activity.name}» (${activity.weekdays.map((d) => WEEKDAY_LABELS[d]).join(', ') || 'без днів'})`} onClick={() => pullFromActivity(e)}>
-                  ↻
-                </button>
-              )}
-              <button type="button" className="btn btn-bad btn-sm" onClick={() => confirm(`Видалити евент «${e.name}»?`) && deleteEvent(e.id).then(reload).catch(reportError)}>
-                Видалити
-              </button>
-            </span>,
-          ];
-        }}
-        addRow={
-          <>
-            <label className="field" style={{ flex: '1 1 200px' }}>
-              <span>Назва</span>
-              <input type="text" value={newName} placeholder="Назва евенту" onChange={(e) => setNewName(e.target.value)} />
+      <div className="rowlist">
+        {events.length === 0 ? (
+          <p className="rowlist-empty hint">Евентів ще немає — додай нижче або підтягни з активностей.</p>
+        ) : (
+          events.map((e) => (
+            <EventRow
+              key={e.id}
+              event={e}
+              activity={e.activityId ? activityById.get(e.activityId) : undefined}
+              onPatch={(p) => patch(e.id, p)}
+              onPull={() => pullFromActivity(e)}
+              onDelete={() => deleteEvent(e.id).then(reload).catch(reportError)}
+            />
+          ))
+        )}
+
+        <div className="rowlist-row event-row event-add">
+          <div className="event-line">
+            <span className="event-add-title">Новий евент</span>
+          </div>
+          <div className="event-line">
+            <input type="text" className="event-name" value={newName} placeholder="Назва евенту" onChange={(e) => setNewName(e.target.value)} />
+            <WhenPicker
+              weekdays={newWeekdays}
+              eventDate={newDate}
+              onChange={(p) => {
+                if (p.weekdays !== undefined) setNewWeekdays(p.weekdays);
+                if (p.eventDate !== undefined) setNewDate(p.eventDate);
+              }}
+            />
+          </div>
+          <div className="event-line">
+            <label className="ctl">
+              час <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
             </label>
-            <div className="field" style={{ flex: '1 1 280px' }}>
-              <span>Коли</span>
-              <WhenPicker
-                weekdays={newWeekdays}
-                eventDate={newDate}
-                onChange={(p) => {
-                  if (p.weekdays !== undefined) setNewWeekdays(p.weekdays);
-                  if (p.eventDate !== undefined) setNewDate(p.eventDate);
-                }}
-              />
+            <label className="ctl">
+              пінг за <input type="number" min={1} max={180} value={newPing} placeholder="—" onChange={(e) => setNewPing(e.target.value)} /> хв
+            </label>
+            <div className="event-actions">
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy || !newName.trim()} onClick={add}>+ Додати</button>
             </div>
-            <label className="field" style={{ flex: '0 0 130px' }}>
-              <span>Час</span>
-              <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
-            </label>
-            <label className="field" style={{ flex: '0 0 110px' }}>
-              <span>Пінг за, хв</span>
-              <input type="number" min={1} max={180} value={newPing} placeholder="—" onChange={(e) => setNewPing(e.target.value)} />
-            </label>
-            <button type="button" className="btn btn-primary" disabled={busy || !newName.trim()} onClick={add}>+ Додати</button>
-          </>
-        }
-      />
+          </div>
+        </div>
+      </div>
       {err && <p className="form-err">{err}</p>}
     </div>
   );
