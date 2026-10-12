@@ -311,4 +311,6 @@ delete from discord_event_pings;
 | Пост є, пінги не приходять | В евента є час **і** число в «пінг за … хв»; крон працює (`cron.job_run_details`); у ролі увімкнено «Дозволити всім згадувати». |
 | Крон є, але `net._http_response` порожня | Секрети Vault не створені або з іншими назвами: `select name from vault.secrets;`. |
 | Кнопка «Оновити зараз» каже «Failed to send a request» | Функція ще не задеплоєна, або `VITE_SUPABASE_URL` вказує на інший проєкт. |
+| Після «Оновити зараз» — «⚠ На Supabase стара версія функції» | Сайт новіший за функцію: `git pull` і `supabase functions deploy discord-events --no-verify-jwt` з кореня репозиторію. |
+| Картинок немає в пості / пінгу / «Подіях» | Та сама причина (стара функція), або не виконана міграція 0009: у SQL Editor `select name, image_url from events_today();` має повертати колонку `image_url`. |
 | «Події» не з'являються | `supabase secrets list`: є `DISCORD_BOT_TOKEN` і `DISCORD_GUILD_ID`; бот доданий на сервер з правом **Manage Events**; в евента є час; міграція 0007 виконана. Текст помилки — у відповіді «Оновити зараз» (поле `warnings`). |

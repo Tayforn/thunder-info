@@ -41,6 +41,7 @@ import {
   triggerDiscordSync,
   updateEvent,
   type DiscordPostState,
+  DISCORD_FN_VERSION,
 } from '../data/events';
 import type { Activity, GuildEvent } from '../data/types';
 import { WEEKDAY_LABELS, WEEKDAY_LABELS_FULL, kyivDateString, todayWeekday } from '../data/types';
@@ -266,7 +267,8 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
             (r.cleaned > 0 ? `, прибрано старих пінгів: ${r.cleaned}` : '') +
             (sch ? `; події Discord: +${sch.created} / змінено ${sch.updated} / −${sch.deleted}` + (sch.started > 0 ? ` / стартовано ${sch.started}` : '') : '') +
             '.' +
-            (r.warnings?.length ? ` Увага: ${r.warnings.join('; ')}` : ''),
+            (r.warnings?.length ? ` Увага: ${r.warnings.join('; ')}` : '') +
+            (r.version === DISCORD_FN_VERSION ? '' : ` ⚠ На Supabase стара версія функції (${r.version ?? 'без номера'}, потрібна ${DISCORD_FN_VERSION}) — передеплой: supabase functions deploy discord-events --no-verify-jwt`),
         );
         onSynced();
       } else {
@@ -489,7 +491,7 @@ function EventsPanel() {
         </div>
       )}
 
-      <div className="rowlist">
+      <div className="event-list">
         {events.length === 0 ? (
           <p className="rowlist-empty hint">Евентів ще немає — додай нижче або підтягни з активностей.</p>
         ) : (

@@ -468,8 +468,22 @@ html[data-theme="light"] .theme-ico-moon { display: inline; }
   padding: 16px 20px; margin-bottom: 18px;
   display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between;
 }
-.events-admin .rowlist-row.event-row { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 14px 18px; }
-.events-admin .event-row.event-add { background: rgba(255, 255, 255, 0.025); border-top: 1px solid var(--line-2); }
+/* кожен евент — окрема картка з проміжком, щоб сусідні не зливались */
+.events-admin .event-list { display: grid; gap: 16px; }
+.events-admin .rowlist-row.event-row,
+.events-admin .rowlist-row.event-row:last-child {
+  display: grid; grid-template-columns: 1fr; gap: 12px; padding: 16px 18px;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--line); border-left: 3px solid var(--accent-2);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+}
+.events-admin .rowlist-row.event-row:hover { background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); border-color: var(--line-2); border-left-color: var(--accent); }
+.events-admin .rowlist-row.event-row.off { border-left-color: var(--line-2); }
+.events-admin .rowlist-row.event-row.event-add,
+.events-admin .rowlist-row.event-row.event-add:hover {
+  background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--line-2); box-shadow: none;
+}
+.events-admin .event-list > .rowlist-empty { margin: 0; padding: 4px 2px; }
 .events-admin .event-add-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-mute); font-weight: 700; }
 .events-admin .event-line { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; min-width: 0; }
 .events-admin .rowlist-row input[type='text'], .events-admin .rowlist-row input[type='time'],

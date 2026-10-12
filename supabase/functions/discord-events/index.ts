@@ -41,6 +41,9 @@
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
+/** Міняти разом з DISCORD_FN_VERSION у src/data/events.ts при кожній зміні
+ * функції — сторінка «ДС Евенти» попередить, якщо задеплоєна стара. */
+const FUNCTION_VERSION = '2026-10-12.images';
 const TZ = 'Europe/Kyiv';
 const WEEKDAYS_FULL = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота'];
 const WEEKDAYS_SHORT = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -670,6 +673,7 @@ async function testPing(db: SupabaseClient, eventId: unknown): Promise<TestPingR
 
 interface SyncResult {
   ok: true;
+  version: string;
   date: string;
   time: string;
   events: number;
@@ -786,7 +790,7 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
     }
   }
 
-  return { ok: true, date: now.date, time: now.hhmm, events: events.length, post, messageId: messageId!, pings, cleaned, scheduled, warnings };
+  return { ok: true, version: FUNCTION_VERSION, date: now.date, time: now.hhmm, events: events.length, post, messageId: messageId!, pings, cleaned, scheduled, warnings };
 }
 
 // ---------------------------------------------------------
@@ -814,6 +818,7 @@ function todayJson(now: KyivNow, events: EventRow[], links: Map<string, string>)
       durationMinutes: e.start_time ? e.duration_minutes ?? DEFAULT_DURATION_MIN : null,
       pingMinutesBefore: e.start_time ? e.ping_minutes_before : null,
       pingRoleId: e.ping_role_id,
+      imageUrl: e.image_url ?? null,
       discordEventUrl: links.has(e.id) ? eventUrl(links.get(e.id)!) : null,
     })),
   };
