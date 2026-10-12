@@ -32,8 +32,12 @@ import {
   eventsForToday,
   fetchDiscordPostState,
   fetchEvents,
+  discordLinkExpiry,
   importActivities,
+  rehostImage,
+  removeEventImage,
   testDiscordPing,
+  uploadEventImage,
   triggerDiscordSync,
   updateEvent,
   type DiscordPostState,
@@ -92,6 +96,100 @@ function NoteInput({ initial, onSave }: { initial: string; onSave: (v: string) =
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => value !== initial && onSave(value)}
     />
+  );
+}
+
+/** Картинка евента: Ctrl+V (картинка з буфера або посилання), перетягнути
+ * файл або вибрати. Вставлена/вибрана картинка заливається в Storage —
+ * посилання постійне. Посилання на чужу картинку пробуємо перезалити до
+ * себе; не вийшло — лишаємо як є (з попередженням, якщо це тимчасове
+ * посилання Discord). */
+function ImageField({ value, onChange }: { value: string | null; onChange: (url: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const run = async (job: () => Promise<string | null>) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const url = await job();
+      if (url) {
+        onChange(url);
+        setText('');
+      }
+    } catch (e) {
+      setErr(errorMessage(e, 'Не вдалося додати картинку.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const fromFile = (file: File | null | undefined) => file && run(() => uploadEventImage(file));
+  const fromUrl = (raw: string) => {
+    const url = raw.trim();
+    if (!/^https?:\/\/\S+$/i.test(url)) {
+      setErr('Встав картинку (Ctrl+V) або посилання на неї.');
+      return;
+    }
+    run(async () => (await rehostImage(url)) ?? url);
+  };
+
+  const onPaste = (ev: React.ClipboardEvent<HTMLInputElement>) => {
+    const file = Array.from(ev.clipboardData.files).find((f) => f.type.startsWith('image/'));
+    ev.preventDefault();
+    if (file) fromFile(file);
+    else fromUrl(ev.clipboardData.getData('text'));
+  };
+  const onDrop = (ev: React.DragEvent) => {
+    ev.preventDefault();
+    const file = Array.from(ev.dataTransfer.files).find((f) => f.type.startsWith('image/'));
+    if (file) fromFile(file);
+    else {
+      const url = ev.dataTransfer.getData('text/uri-list') || ev.dataTransfer.getData('text');
+      if (url) fromUrl(url);
+    }
+  };
+
+  const expiry = value ? discordLinkExpiry(value) : null;
+
+  return (
+    <div className="event-image" onDragOver={(ev) => ev.preventDefault()} onDrop={onDrop}>
+      {value ? (
+        <div className="event-image-set">
+          <a href={value} target="_blank" rel="noreferrer" title="Відкрити картинку">
+            <img src={value} alt="" />
+          </a>
+          <button type="button" className="btn btn-ghost btn-sm" title="Прибрати картинку" disabled={busy} onClick={() => onChange(null)}>
+            ✕
+          </button>
+        </div>
+      ) : (
+        <div className="event-image-empty">
+          <input
+            type="text"
+            value={text}
+            disabled={busy}
+            placeholder={busy ? 'Завантаження…' : '🖼 Картинка: Ctrl+V'}
+            title="Скопіюй картинку (у Discord: ПКМ → Копіювати зображення) і натисни тут Ctrl+V. Можна перетягнути файл або вставити посилання."
+            onPaste={onPaste}
+            onChange={(ev) => setText(ev.target.value)}
+            onKeyDown={(ev) => ev.key === 'Enter' && text.trim() && fromUrl(text)}
+            onBlur={() => text.trim() && fromUrl(text)}
+          />
+          <button type="button" className="btn btn-ghost btn-sm" title="Вибрати файл" disabled={busy} onClick={() => fileRef.current?.click()}>
+            📁
+          </button>
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(ev) => { fromFile(ev.target.files?.[0]); ev.target.value = ''; }} />
+        </div>
+      )}
+      {expiry && (
+        <span className="hint event-image-warn">
+          Тимчасове посилання Discord{expiry.getTime() > Date.now() ? `, спливе ${expiry.toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' })}` : ', вже не працює'}. Краще встав саму картинку: у Discord ПКМ → «Копіювати зображення» → тут Ctrl+V.
+        </span>
+      )}
+      {err && <span className="form-err">{err}</span>}
+    </div>
   );
 }
 
@@ -270,7 +368,17 @@ function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: Gu
         </div>
       </div>
 
-      <NoteInput initial={e.note ?? ''} onSave={(v) => onPatch({ note: v })} />
+      <div className="event-note-line">
+        <NoteInput initial={e.note ?? ''} onSave={(v) => onPatch({ note: v })} />
+        <ImageField
+          value={e.imageUrl}
+          onChange={(url) => {
+            const old = e.imageUrl;
+            onPatch({ imageUrl: url });
+            if (old && old !== url) removeEventImage(old);
+          }}
+        />
+      </div>
       {!e.eventDate && e.weekdays.length === 0 && <span className="hint event-warn">Дні не вибрано — у пост не потрапить.</span>}
     </div>
   );
@@ -363,6 +471,7 @@ function EventsPanel() {
                 {e.startTime ? <b>{e.startTime}</b> : <span className="hint">без часу</span>} — {e.name}
                 {e.startTime && e.pingMinutesBefore ? <span className="hint"> · пінг за {e.pingMinutesBefore} хв</span> : null}
                 {e.note ? <span className="hint"> · {e.note.split('\n')[0]}{e.note.includes('\n') ? ' …' : ''}</span> : null}
+                {e.imageUrl ? <span className="hint"> · 🖼</span> : null}
               </li>
             ))}
           </ul>
@@ -391,7 +500,7 @@ function EventsPanel() {
               activity={e.activityId ? activityById.get(e.activityId) : undefined}
               onPatch={(p) => patch(e.id, p)}
               onPull={() => pullFromActivity(e)}
-              onDelete={() => deleteEvent(e.id).then(reload).catch(reportError)}
+              onDelete={() => deleteEvent(e.id).then(() => removeEventImage(e.imageUrl)).then(reload).catch(reportError)}
             />
           ))
         )}

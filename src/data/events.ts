@@ -23,6 +23,7 @@ interface EventDbRow {
   duration_minutes: number | null;
   ping_minutes_before: number | null;
   ping_role_id: string | null;
+  image_url?: string | null;
   enabled: boolean;
   sort_order: number;
 }
@@ -44,6 +45,7 @@ function fromDb(r: EventDbRow): GuildEvent {
     durationMinutes: r.duration_minutes,
     pingMinutesBefore: r.ping_minutes_before,
     pingRoleId: r.ping_role_id,
+    imageUrl: r.image_url ?? null,
     enabled: r.enabled,
     sortOrder: r.sort_order,
   };
@@ -71,6 +73,7 @@ export interface EventInput {
   durationMinutes: number | null;
   pingMinutesBefore: number | null;
   pingRoleId: string | null;
+  imageUrl: string | null;
   enabled: boolean;
   activityId: string | null;
 }
@@ -85,6 +88,7 @@ function toDb(patch: Partial<EventInput>): Record<string, unknown> {
   if (patch.durationMinutes !== undefined) db.duration_minutes = patch.durationMinutes;
   if (patch.pingMinutesBefore !== undefined) db.ping_minutes_before = patch.pingMinutesBefore;
   if (patch.pingRoleId !== undefined) db.ping_role_id = patch.pingRoleId?.trim() || null;
+  if (patch.imageUrl !== undefined) db.image_url = patch.imageUrl?.trim() || null;
   if (patch.enabled !== undefined) db.enabled = patch.enabled;
   if (patch.activityId !== undefined) db.activity_id = patch.activityId;
   return db;
@@ -103,6 +107,55 @@ export async function updateEvent(id: string, patch: Partial<EventInput>): Promi
 export async function deleteEvent(id: string): Promise<void> {
   const { error } = await supabase.from('events').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---------------------------------------------------------
+// Картинки евентів — публічний бакет Storage `event-images` (міграція 0009).
+// ---------------------------------------------------------
+
+const IMAGE_BUCKET = 'event-images';
+const IMAGE_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Залити картинку (вставлену Ctrl+V / перетягнуту / вибрану) — повертає постійне публічне посилання. */
+export async function uploadEventImage(file: Blob): Promise<string> {
+  const ext = IMAGE_EXT[file.type];
+  if (!ext) throw new Error('Підтримуються PNG, JPG, GIF і WebP.');
+  if (file.size > IMAGE_MAX_BYTES) throw new Error('Картинка більша за 5 МБ.');
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  const { error } = await supabase.storage.from(IMAGE_BUCKET).upload(path, file, { contentType: file.type, cacheControl: '31536000', upsert: false });
+  if (error) throw error;
+  return supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/** Видалити картинку зі Storage, якщо вона наша (зовнішні посилання не чіпаємо). Помилки ігноруються. */
+export async function removeEventImage(url: string | null): Promise<void> {
+  if (!url) return;
+  const marker = `/storage/v1/object/public/${IMAGE_BUCKET}/`;
+  const i = url.indexOf(marker);
+  if (i < 0) return;
+  await supabase.storage.from(IMAGE_BUCKET).remove([decodeURIComponent(url.slice(i + marker.length))]).catch(() => undefined);
+}
+
+/** Чужу картинку за посиланням — спробувати перезалити до себе (постійне
+ * посилання). Якщо сайт не дає її забрати (CORS) — null. */
+export async function rehostImage(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    if (!IMAGE_EXT[blob.type]) return null;
+    return await uploadEventImage(blob);
+  } catch {
+    return null;
+  }
+}
+
+/** Посилання з cdn.discordapp.com/attachments спливають (параметр ex — час у hex). */
+export function discordLinkExpiry(url: string): Date | null {
+  if (!/^https:\/\/(cdn|media)\.discordapp\.(com|net)\/attachments\//.test(url)) return null;
+  const m = /[?&]ex=([0-9a-f]+)/i.exec(url);
+  return m ? new Date(parseInt(m[1], 16) * 1000) : new Date();
 }
 
 /** Активності, для яких ще немає евента (нові створюються тригером у БД,

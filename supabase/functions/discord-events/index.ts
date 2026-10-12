@@ -80,6 +80,8 @@ interface EventRow {
   duration_minutes: number | null;
   ping_minutes_before: number | null;
   ping_role_id: string | null;
+  /** Картинка (міграція 0009); до міграції — undefined. */
+  image_url?: string | null;
   sort_order: number;
 }
 
@@ -96,6 +98,8 @@ interface ScheduledRow {
   starts_at: string;
   ends_at: string;
   started: boolean;
+  /** Яка картинка зараз стоїть обкладинкою події в Discord. */
+  image_url?: string | null;
 }
 
 interface PostState {
@@ -290,6 +294,21 @@ function buildPost(now: KyivNow, events: EventRow[], links: Map<string, string>)
     return head + note;
   });
   const description = lines.length ? lines.join('\n') : 'Сьогодні евентів немає 😴';
+  // Картинки евентів — окремими блоками під списком (Discord дозволяє до 10
+  // блоків у повідомленні: 1 список + до 9 картинок).
+  const images = events
+    .filter((e) => e.image_url)
+    .slice(0, 9)
+    .map((e) => {
+      const time = hhmm(e.start_time);
+      const link = links.get(e.id);
+      return {
+        title: (time ? `🕒 ${time} — ${e.name}` : e.name).slice(0, 256),
+        ...(link ? { url: eventUrl(link) } : {}),
+        color: EMBED_COLOR,
+        image: { url: e.image_url },
+      };
+    });
   return {
     embeds: [
       {
@@ -298,9 +317,27 @@ function buildPost(now: KyivNow, events: EventRow[], links: Map<string, string>)
         color: EMBED_COLOR,
         footer: { text: 'Час київський · оновлюється автоматично' },
       },
+      ...images,
     ],
     allowed_mentions: { parse: [] },
   };
+}
+
+/** Картинка → data URI для обкладинки «Події» (Discord приймає лише так). */
+async function imageDataUri(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const type = (r.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(type)) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (bytes.length > 8 * 1024 * 1024) return null;
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return `data:${type};base64,${btoa(bin)}`;
+  } catch {
+    return null;
+  }
 }
 
 /** Кого пінгувати: роль евента → DISCORD_PING_ROLE_ID → @here.
@@ -325,6 +362,7 @@ function buildPing(e: EventRow, minutesLeft: number, discordEventId: string | un
   const link = discordEventId ? `\n${eventUrl(discordEventId)}` : '';
   return {
     content: `${mention} ⏰ ${when} — **${e.name}** (${time})${note}${link}`,
+    ...(e.image_url ? { embeds: [{ color: EMBED_COLOR, image: { url: e.image_url } }] } : {}),
     allowed_mentions: allowed,
   };
 }
@@ -409,6 +447,7 @@ interface DesiredEvent {
   endMs: number;
   payload: Record<string, unknown>;
   hash: string;
+  imageUrl: string | null;
 }
 
 async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: string[]): Promise<ScheduleResult | null> {
@@ -441,7 +480,7 @@ async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: s
     const key = `${r.id}|${r.event_date}`;
     // у хеші й id сервера: інший сервер → PATCH старої події дає 404 → створюється нова
     const hash = await sha256(`${DISCORD_GUILD_ID}|${JSON.stringify(payload)}`);
-    desired.set(key, { key, eventId: r.id, date: r.event_date, startMs: start.getTime(), endMs: end.getTime(), payload, hash });
+    desired.set(key, { key, eventId: r.id, date: r.event_date, startMs: start.getTime(), endMs: end.getTime(), payload, hash, imageUrl: r.image_url ?? null });
   }
 
   const { data: rowsData, error: rowsErr } = await db.from('discord_scheduled_events').select('*');
@@ -474,13 +513,35 @@ async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: s
     existing.delete(key);
   }
 
-  // 2. Створити нові / оновити змінені.
+  // 2. Створити нові / оновити змінені. Обкладинка (картинка) — окремо від
+  //    хешу: заливається лише коли змінилось посилання (row.image_url).
   for (const d of desired.values()) {
     let row = existing.get(d.key);
     const startPassed = d.startMs <= nowMs;
+    const contentChanged = !!row && row.content_hash !== d.hash;
+    const imageChanged = !!row && (row.image_url ?? null) !== d.imageUrl;
 
-    if (row && row.content_hash !== d.hash && !startPassed) {
-      const r = await discord('PATCH', guildEventsUrl(row.discord_event_id), d.payload, botHeaders());
+    if (row && (contentChanged || imageChanged) && !startPassed) {
+      const body: Record<string, unknown> = { ...d.payload };
+      let nextImage = row.image_url ?? null;
+      if (imageChanged) {
+        if (d.imageUrl) {
+          const data = await imageDataUri(d.imageUrl);
+          if (data) {
+            body.image = data;
+            nextImage = d.imageUrl;
+          } else {
+            warn(`«${d.payload.name}»: не вдалося завантажити картинку для обкладинки`);
+          }
+        } else {
+          body.image = null;
+          nextImage = null;
+        }
+      }
+      // змінилась лише картинка, а завантажити її не вдалось — Discord не смикаємо
+      if (!contentChanged && nextImage === (row.image_url ?? null)) continue;
+
+      const r = await discord('PATCH', guildEventsUrl(row.discord_event_id), body, botHeaders());
       if (r.status === 429) {
         warn('ліміт запитів Discord, решта — на наступному запуску');
         return res;
@@ -495,14 +556,31 @@ async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: s
         // хеш зберігаємо і при помилці — інакше та сама невдала правка
         // повторюватиметься кожні 5 хв.
         await db.from('discord_scheduled_events')
-          .update({ content_hash: d.hash, starts_at: new Date(d.startMs).toISOString(), ends_at: new Date(d.endMs).toISOString(), updated_at: new Date().toISOString() })
+          .update({
+            content_hash: d.hash,
+            image_url: r.ok ? nextImage : row.image_url ?? null,
+            starts_at: new Date(d.startMs).toISOString(),
+            ends_at: new Date(d.endMs).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .match({ event_id: d.eventId, event_date: d.date });
       }
     }
 
     if (!row) {
       if (startPassed) continue; // Discord не створює подію з початком у минулому
-      const r = await discord('POST', guildEventsUrl(), d.payload, botHeaders());
+      const body: Record<string, unknown> = { ...d.payload };
+      let image: string | null = null;
+      if (d.imageUrl) {
+        const data = await imageDataUri(d.imageUrl);
+        if (data) {
+          body.image = data;
+          image = d.imageUrl;
+        } else {
+          warn(`«${d.payload.name}»: не вдалося завантажити картинку для обкладинки`);
+        }
+      }
+      const r = await discord('POST', guildEventsUrl(), body, botHeaders());
       if (r.status === 429) {
         warn('ліміт запитів Discord, решта — на наступному запуску');
         return res;
@@ -520,6 +598,7 @@ async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: s
         starts_at: new Date(d.startMs).toISOString(),
         ends_at: new Date(d.endMs).toISOString(),
         started: false,
+        image_url: image,
       };
       await db.from('discord_scheduled_events').upsert({ ...fresh, updated_at: new Date().toISOString() });
       existing.set(d.key, fresh);
@@ -566,7 +645,7 @@ async function testPing(db: SupabaseClient, eventId: unknown): Promise<TestPingR
   if (typeof eventId !== 'string' || !/^[0-9a-f-]{36}$/i.test(eventId)) throw new HttpError(400, 'Потрібен eventId.');
   const { data, error } = await db
     .from('events')
-    .select('id, name, start_time, note, duration_minutes, ping_minutes_before, ping_role_id, sort_order')
+    .select('*')
     .eq('id', eventId)
     .maybeSingle();
   if (error) throw new HttpError(500, `events: ${error.message}`);

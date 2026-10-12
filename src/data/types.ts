@@ -87,6 +87,8 @@ export interface GuildEvent {
   pingMinutesBefore: number | null;
   /** ID ролі Discord для пінгу; null → DISCORD_PING_ROLE_ID функції або @here. */
   pingRoleId: string | null;
+  /** Картинка (Storage event-images або зовнішнє посилання) — у пості, пінгу й обкладинкою «Події». */
+  imageUrl: string | null;
   enabled: boolean;
   sortOrder: number;
 }

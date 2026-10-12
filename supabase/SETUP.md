@@ -11,7 +11,8 @@
    (сторінка «ДС Евенти» + пост з евентами в Discord — далі за інструкцією [DISCORD.md](DISCORD.md)),
    `migrations/0006_stable_sort_order.sql` (стабільний порядок рядків в «Активностях» і «Евентах»),
    `migrations/0007_discord_scheduled_events.sql` (тривалість евента + «Події» Discord),
-   `migrations/0008_admin_roles.sql` (роль адміна: повний доступ або лише «Евенти»).
+   `migrations/0008_admin_roles.sql` (роль адміна: повний доступ або лише «Евенти»),
+   `migrations/0009_event_images.sql` (картинки евентів + бакет Storage `event-images`).
    - Якщо рядок `create extension if not exists pg_cron;` впаде через права доступу — увімкни pg_cron вручну через
      **Dashboard → Database → Extensions**, потім запусти міграцію ще раз (вона ідемпотентна, `create table if not exists` і `on conflict do nothing` не зашкодять).
 3. **Project Settings → API** — скопіюй `Project URL` і `anon public` ключ у `.env.local`:
