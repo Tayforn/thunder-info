@@ -233,8 +233,8 @@ function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: Gu
         <label className="ctl" title="Тривалість для «Події» Discord; порожньо = 60 хв">
           триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => onPatch({ durationMinutes: v })} /> хв
         </label>
-        <label className="ctl" title="ID ролі Discord для пінгу; порожньо = роль за замовчуванням із секретів або @here">
-          роль <TextInput className="ctl-role" initial={e.pingRoleId ?? ''} placeholder="ID ролі" allowEmpty onSave={(v) => onPatch({ pingRoleId: v })} />
+        <label className="ctl" title="Кого пінгувати: ID ролі, everyone (усі, хто бачить канал) або here (лише онлайн); порожньо = значення за замовчуванням із секретів">
+          роль <TextInput className="ctl-role" initial={e.pingRoleId ?? ''} placeholder="ID ролі / everyone" allowEmpty onSave={(v) => onPatch({ pingRoleId: v })} />
         </label>
         <label className="ctl ctl-on" title={e.enabled ? 'Увімкнено — потрапляє в пост і «Події»' : 'Вимкнено — у пост не потрапляє'}>
           <input type="checkbox" checked={e.enabled} onChange={(ev) => onPatch({ enabled: ev.target.checked })} /> увімк.

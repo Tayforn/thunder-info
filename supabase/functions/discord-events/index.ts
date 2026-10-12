@@ -300,16 +300,29 @@ function buildPost(now: KyivNow, events: EventRow[], links: Map<string, string>)
   };
 }
 
+/** Кого пінгувати: роль евента → DISCORD_PING_ROLE_ID → @here.
+ * "everyone"/"@everyone" або ID сервера (ID ролі @everyone = ID сервера, але
+ * згадка <@&ID сервера> нікого не сповіщає) → справжній @everyone;
+ * "here"/"@here" → @here; число → роль. */
+function pingTarget(e: EventRow): { mention: string; allowed: WebhookPayload['allowed_mentions'] } {
+  const raw = (e.ping_role_id?.trim() || DISCORD_PING_ROLE_ID || '').replace(/^<@&(\d+)>$/, '$1');
+  const key = raw.toLowerCase().replace(/^@/, '');
+  if (key === 'everyone' || (DISCORD_GUILD_ID && raw === DISCORD_GUILD_ID)) {
+    return { mention: '@everyone', allowed: { parse: ['everyone'] } };
+  }
+  if (/^\d{5,25}$/.test(raw)) return { mention: `<@&${raw}>`, allowed: { roles: [raw] } };
+  return { mention: '@here', allowed: { parse: ['everyone'] } };
+}
+
 function buildPing(e: EventRow, minutesLeft: number, discordEventId: string | undefined): WebhookPayload {
-  const roleId = e.ping_role_id?.trim() || DISCORD_PING_ROLE_ID || '';
-  const mention = roleId ? `<@&${roleId}>` : '@here';
+  const { mention, allowed } = pingTarget(e);
   const time = hhmm(e.start_time) ?? '';
   const when = minutesLeft <= 0 ? 'зараз' : `через ${minutesLeft} хв`;
   const note = noteLines(e.note).map((l) => `\n${l}`).join('');
   const link = discordEventId ? `\n${eventUrl(discordEventId)}` : '';
   return {
     content: `${mention} ⏰ ${when} — **${e.name}** (${time})${note}${link}`,
-    allowed_mentions: roleId ? { roles: [roleId] } : { parse: ['everyone'] },
+    allowed_mentions: allowed,
   };
 }
 
