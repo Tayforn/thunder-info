@@ -10,6 +10,9 @@
 //                                   прибрати вчорашні пінги з каналу.
 //   POST /discord-events/clean    → прибрати з каналу ВСІ надіслані пінги
 //                                   (і сьогоднішні); пост лишається.
+//   POST /discord-events/test-ping {eventId}
+//                                 → надіслати пінг евента зараз (поза вікном
+//                                   і позначками); справжній пінг не зачіпає.
 //
 // З ботом (DISCORD_BOT_TOKEN + DISCORD_GUILD_ID) sync ще й веде «Події»
 // сервера (Scheduled Events): по одній на кожен евент з часом на найближчі
@@ -546,6 +549,43 @@ async function syncScheduledEvents(db: SupabaseClient, now: KyivNow, warnings: s
 }
 
 // ---------------------------------------------------------
+// Тестовий пінг (кнопка «Тест пінгу»): той самий текст і той самий адресат,
+// що й справжній, але зараз — без вікна «за N хв» і без позначки «вже
+// пінгували сьогодні». Повідомлення записується в discord_event_pings під
+// випадковим event_id: «Почистити пінги» та нічне чищення приберуть його з
+// каналу, а справжній пінг евента не заблокує.
+// ---------------------------------------------------------
+
+interface TestPingResult {
+  ok: true;
+  event: string;
+  mention: string;
+}
+
+async function testPing(db: SupabaseClient, eventId: unknown): Promise<TestPingResult> {
+  if (typeof eventId !== 'string' || !/^[0-9a-f-]{36}$/i.test(eventId)) throw new HttpError(400, 'Потрібен eventId.');
+  const { data, error } = await db
+    .from('events')
+    .select('id, name, start_time, note, duration_minutes, ping_minutes_before, ping_role_id, sort_order')
+    .eq('id', eventId)
+    .maybeSingle();
+  if (error) throw new HttpError(500, `events: ${error.message}`);
+  if (!data) throw new HttpError(404, 'Евент не знайдено.');
+  const e = data as EventRow;
+
+  const now = kyivNow();
+  const links = await loadTodayLinks(db, now.date);
+  const payload = buildPing(e, e.ping_minutes_before ?? 15, links.get(e.id));
+  payload.content = `${payload.content}\n-# 🧪 тестовий пінг`;
+
+  const r = await discord('POST', createUrl(), payload);
+  if (!r.ok) throw await discordError('Тестовий пінг', r);
+  const msg = (await r.json()) as { id: string };
+  await db.from('discord_event_pings').insert({ event_id: crypto.randomUUID(), ping_date: now.date, message_id: msg.id });
+  return { ok: true, event: e.name, mention: pingTarget(e).mention };
+}
+
+// ---------------------------------------------------------
 // Синхронізація.
 // ---------------------------------------------------------
 
@@ -708,11 +748,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
     await authorize(req, db);
 
     const path = new URL(req.url).pathname.replace(/\/+$/, '');
-    const action = path.endsWith('/sync') ? 'sync' : path.endsWith('/clean') ? 'clean' : path.endsWith('/preview') ? 'preview' : 'today';
+    const action = path.endsWith('/sync')
+      ? 'sync'
+      : path.endsWith('/clean')
+        ? 'clean'
+        : path.endsWith('/test-ping')
+          ? 'test-ping'
+          : path.endsWith('/preview')
+            ? 'preview'
+            : 'today';
 
-    if (action === 'sync' || action === 'clean') {
+    if (action === 'sync' || action === 'clean' || action === 'test-ping') {
       if (req.method !== 'POST') throw new HttpError(405, `${action} — лише POST.`);
-      return json(action === 'sync' ? await sync(db) : await cleanPings(db));
+      if (action === 'sync') return json(await sync(db));
+      if (action === 'clean') return json(await cleanPings(db));
+      const body = (await req.json().catch(() => ({}))) as { eventId?: unknown };
+      return json(await testPing(db, body.eventId));
     }
 
     const now = kyivNow();

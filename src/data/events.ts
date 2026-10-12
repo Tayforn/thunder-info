@@ -210,8 +210,14 @@ export function cleanDiscordPings(): Promise<CleanResult> {
   return invokeDiscord<CleanResult>('clean', 'Не вдалося почистити пінги.');
 }
 
-async function invokeDiscord<T>(action: 'sync' | 'clean', fallback: string): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T>(`discord-events/${action}`, { method: 'POST', body: {} });
+/** Надіслати пінг евента зараз (перевірка ролі/@everyone); справжній
+ * пінг перед евентом не зачіпає. */
+export function testDiscordPing(eventId: string): Promise<{ event: string; mention: string }> {
+  return invokeDiscord('test-ping', 'Не вдалося надіслати тестовий пінг.', { eventId });
+}
+
+async function invokeDiscord<T>(action: 'sync' | 'clean' | 'test-ping', fallback: string, body: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>(`discord-events/${action}`, { method: 'POST', body });
   if (error) {
     let message = error.message || fallback;
     const ctx = (error as { context?: unknown }).context;

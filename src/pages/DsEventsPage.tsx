@@ -33,6 +33,7 @@ import {
   fetchDiscordPostState,
   fetchEvents,
   importActivities,
+  testDiscordPing,
   triggerDiscordSync,
   updateEvent,
   type DiscordPostState,
@@ -216,6 +217,20 @@ type Patch = Parameters<typeof updateEvent>[1];
 
 function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: GuildEvent; activity: Activity | undefined; onPatch: (p: Patch) => void; onPull: () => void; onDelete: () => void }) {
   const diverged = divergedFromActivity(e, activity);
+  const [testing, setTesting] = useState(false);
+  const target = e.pingRoleId?.trim() || 'роль за замовчуванням';
+  const testPing = async () => {
+    if (!confirm(`Надіслати тестовий пінг «${e.name}» у канал зараз? Пінгне: ${target}. Справжній пінг перед евентом це не зачепить.`)) return;
+    setTesting(true);
+    try {
+      const r = await testDiscordPing(e.id);
+      alert(`Тестовий пінг «${r.event}» надіслано (${r.mention}). Прибрати — «Почистити пінги».`);
+    } catch (err) {
+      reportError(err);
+    } finally {
+      setTesting(false);
+    }
+  };
   return (
     <div className={'rowlist-row event-row' + (e.enabled ? '' : ' off')}>
       <div className="event-line">
@@ -246,6 +261,9 @@ function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: Gu
               ↻ з активності
             </button>
           )}
+          <button type="button" className="btn btn-ghost btn-sm" disabled={testing} title="Надіслати пінг цього евента в канал зараз — перевірити роль / @everyone" onClick={testPing}>
+            {testing ? '…' : 'Тест пінгу'}
+          </button>
           <button type="button" className="btn btn-bad btn-sm" onClick={() => confirm(`Видалити евент «${e.name}»?`) && onDelete()}>
             Видалити
           </button>
