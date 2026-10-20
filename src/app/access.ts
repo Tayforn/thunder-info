@@ -23,6 +23,7 @@ export const ROUTE_ACCESS: Record<Route['name'], AccessLevel> = {
   players: 'member',
   activity: 'admin',
   r8: 'admin',
+  rb: 'admin',
   events: 'admin',
   admin: 'admin',
 };
