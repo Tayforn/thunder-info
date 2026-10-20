@@ -812,3 +812,5 @@ html[data-theme='light'] .date-nav input[type='date'] {
 .rb-online-item.on { color: var(--accent-3); font-weight: 600; }
 .rb-reset:disabled { opacity: 0.35; cursor: default; }
 .rb-reset:disabled:hover { background: rgba(255, 255, 255, 0.03); border-color: var(--accent-2); }
+.rb-add { margin-top: 8px; }
+.rb-add input[type='text'] { padding: 6px 10px; font-size: 13px; }

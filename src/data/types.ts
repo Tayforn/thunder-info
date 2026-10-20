@@ -10,6 +10,9 @@ export interface ClassRow {
    * нарахуванні (award_daily_points). За замовчуванням 1. */
   coef: number;
   sortOrder: number;
+  /** Емодзі реакції «я онлайн» цього класу під постом збору на РБ
+   * (`<:name:id>` або юнікод); null — клас у зборі не бере участі. */
+  rbEmoji: string | null;
 }
 
 export interface Newbie {
