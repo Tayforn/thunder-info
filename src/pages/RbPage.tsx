@@ -125,6 +125,8 @@ function RbManager() {
       [bossId]: { sinId: prev[bossId]?.sinId ?? null, guardId: prev[bossId]?.guardId ?? null, [key]: playerId || null },
     }));
 
+  const resetSlot = (bossId: string) => setSlots((prev) => ({ ...prev, [bossId]: { sinId: null, guardId: null } }));
+
   const assignedIds = useMemo(() => {
     const ids = new Set<string>();
     selectedBosses.forEach((b) => {
@@ -135,6 +137,12 @@ function RbManager() {
     return ids;
   }, [slots, selectedBosses]);
   const reserve = onlinePlayers.filter((p) => !assignedIds.has(p.id));
+
+  const sinOnline = onlinePlayers.filter(isSin);
+  const guardOnline = onlinePlayers.filter(isGuard);
+  // Варіанти для селекта: лише своя роль, без тих, хто вже стоїть на іншому
+  // слоті (поточне значення лишаємо, інакше селект «втратить» вибір).
+  const optionsFor = (pool: Player[], current: string | null) => pool.filter((p) => p.id === current || !assignedIds.has(p.id));
 
   const bgColor = () => getComputedStyle(document.body).backgroundColor || '#111';
 
@@ -194,14 +202,26 @@ function RbManager() {
         {candidates.length === 0 ? (
           <p className="hint">Нема персонажів вибраних класів — зміни вибір вище або додай гравців у «Гравці» / Адмінці.</p>
         ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {candidates.map((p) => (
-              <label key={p.id} className="checkbox-row" style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius)', padding: '6px 10px' }}>
-                <input type="checkbox" checked={onlineIds.has(p.id)} onChange={() => toggleInSet(setOnlineIds, p.id)} />
-                {p.nickname}
-                <ClassBadge cls={p.classId ? classById.get(p.classId) ?? null : null} />
-              </label>
-            ))}
+          <div className="rb-online">
+            {classes.filter((c) => selectedClassIds.has(c.id)).map((c) => {
+              const group = candidates.filter((p) => p.classId === c.id);
+              if (group.length === 0) return null;
+              const on = group.filter((p) => onlineIds.has(p.id)).length;
+              return (
+                <div key={c.id} className="rb-online-group">
+                  <div className="rb-online-head">
+                    <ClassBadge cls={c} />
+                    <span className="hint">{on} / {group.length}</span>
+                  </div>
+                  {group.map((p) => (
+                    <label key={p.id} className={'checkbox-row rb-online-item' + (onlineIds.has(p.id) ? ' on' : '')}>
+                      <input type="checkbox" checked={onlineIds.has(p.id)} onChange={() => toggleInSet(setOnlineIds, p.id)} />
+                      <span>{p.nickname}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -234,31 +254,39 @@ function RbManager() {
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>Розподіл (можна поправити вручну)</h3>
           <div className="rowlist">
-            <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(110px, 1fr) 1fr 1fr' }}>
+            <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(110px, 1fr) 1fr 1fr 110px' }}>
               <span>Бос</span>
               <span>Сін</span>
               <span>Танк/Сікер</span>
+              <span></span>
             </div>
             {selectedBosses.map((b) => {
               const slot = slots[b.id];
+              const sinId = slot?.sinId ?? null;
+              const guardId = slot?.guardId ?? null;
               return (
-                <div key={b.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(110px, 1fr) 1fr 1fr' }}>
+                <div key={b.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(110px, 1fr) 1fr 1fr 110px' }}>
                   <span title={b.name} style={{ fontWeight: 700 }}>{b.nick}</span>
                   <span>
-                    <select value={slot?.sinId ?? ''} onChange={(e) => setSlot(b.id, 'sinId', e.target.value)}>
+                    <select value={sinId ?? ''} onChange={(e) => setSlot(b.id, 'sinId', e.target.value)}>
                       <option value="">—</option>
-                      {onlinePlayers.map((p) => (
+                      {optionsFor(sinOnline, sinId).map((p) => (
                         <option key={p.id} value={p.id}>{p.nickname}</option>
                       ))}
                     </select>
                   </span>
                   <span>
-                    <select value={slot?.guardId ?? ''} onChange={(e) => setSlot(b.id, 'guardId', e.target.value)}>
+                    <select value={guardId ?? ''} onChange={(e) => setSlot(b.id, 'guardId', e.target.value)}>
                       <option value="">—</option>
-                      {onlinePlayers.map((p) => (
+                      {optionsFor(guardOnline, guardId).map((p) => (
                         <option key={p.id} value={p.id}>{p.nickname}</option>
                       ))}
                     </select>
+                  </span>
+                  <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn btn-ghost btn-sm rb-reset" disabled={!sinId && !guardId} onClick={() => resetSlot(b.id)}>
+                      Скинути
+                    </button>
                   </span>
                 </div>
               );
