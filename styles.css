@@ -790,3 +790,25 @@ html[data-theme='light'] .date-nav input[type='date'] {
   border-bottom: 1px solid var(--line-2);
 }
 .rb-print-boss { font-weight: 700; color: var(--accent-3); }
+
+/* Чеклист «хто онлайн» на /rb — колонка на клас, вертикальні списки. */
+.rb-online { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.rb-online-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.rb-online-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.rb-online-item { padding: 5px 6px; border-radius: var(--radius); }
+.rb-online-item:hover { background: rgba(255, 255, 255, 0.04); }
+.rb-online-item.on { color: var(--accent-3); font-weight: 600; }
+.rb-reset:disabled { opacity: 0.35; cursor: default; }
+.rb-reset:disabled:hover { background: rgba(255, 255, 255, 0.03); border-color: var(--accent-2); }
