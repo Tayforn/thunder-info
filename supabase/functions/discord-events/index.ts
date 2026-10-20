@@ -19,6 +19,7 @@
 //   GET  /discord-events/rb-reactions
 //                                 → хто відмітився під постом збору, по
 //                                   класах, із серверними ніками (бот).
+//   POST /discord-events/rb-delete → прибрати активний пост збору з каналу.
 //
 // З ботом (DISCORD_BOT_TOKEN + DISCORD_GUILD_ID) sync ще й веде «Події»
 // сервера (Scheduled Events): по одній на кожен евент з часом на найближчі
@@ -1003,6 +1004,18 @@ async function createRbPoll(db: SupabaseClient): Promise<RbPostResult> {
   return { ok: true, version: FUNCTION_VERSION, messageId: msg.id, postedAt, warnings };
 }
 
+/** Прибрати активний пост збору з каналу (і забути його). 404 = уже
+ * видалили руками — теж успіх. */
+async function deleteRbPoll(db: SupabaseClient): Promise<{ ok: true; version: string; deleted: boolean }> {
+  const poll = await loadRbPoll(db);
+  if (!poll) return { ok: true, version: FUNCTION_VERSION, deleted: false };
+  const d = await discord('DELETE', messageUrl(poll.message_id));
+  if (!d.ok && d.status !== 404) throw await discordError('Видалення поста збору', d);
+  const { error } = await db.from('discord_rb_poll').delete().eq('id', 1);
+  if (error) throw new HttpError(500, `discord_rb_poll delete: ${error.message}`);
+  return { ok: true, version: FUNCTION_VERSION, deleted: d.ok };
+}
+
 async function rbReactions(db: SupabaseClient): Promise<RbReactionsResult> {
   requireBot();
   const classes = await loadRbClasses(db);
@@ -1100,11 +1113,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
               ? 'rb-post'
               : path.endsWith('/rb-reactions')
                 ? 'rb-reactions'
-                : 'today';
+                : path.endsWith('/rb-delete')
+                  ? 'rb-delete'
+                  : 'today';
 
-    if (action === 'rb-post') {
-      if (req.method !== 'POST') throw new HttpError(405, 'rb-post — лише POST.');
-      return json(await createRbPoll(db));
+    if (action === 'rb-post' || action === 'rb-delete') {
+      if (req.method !== 'POST') throw new HttpError(405, `${action} — лише POST.`);
+      return json(action === 'rb-post' ? await createRbPoll(db) : await deleteRbPoll(db));
     }
     if (action === 'rb-reactions') return json(await rbReactions(db));
 
