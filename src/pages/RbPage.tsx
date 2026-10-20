@@ -291,8 +291,9 @@ function RbManager() {
       setSlots({});
       setExcludedIds(new Set());
       setExtras([]);
-      if (r.warnings.length) setActionErr(r.warnings.join(' '));
       await loadReactions();
+      // loadReactions скидає помилку на старті — попередження поста додаємо після нього.
+      if (r.warnings.length) setActionErr((prev) => [r.warnings.join(' '), prev].filter(Boolean).join(' '));
     } catch (e) {
       setActionErr(errorMessage(e, 'Не вдалося створити пост збору.'));
       setBusy(null);

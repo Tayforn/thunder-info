@@ -1020,8 +1020,9 @@ async function rbReactions(db: SupabaseClient): Promise<RbReactionsResult> {
   requireBot();
   const classes = await loadRbClasses(db);
   const groups: RbGroup[] = classes.map((c) => ({ classId: c.id, className: c.name, emoji: c.emoji.display, people: [] }));
+  const warnings: string[] = [];
   const poll = await loadRbPoll(db);
-  if (!poll) return { ok: true, version: FUNCTION_VERSION, poll: null, groups, warnings: [] };
+  if (!poll) return { ok: true, version: FUNCTION_VERSION, poll: null, groups, warnings };
 
   // Серверний нік (у гільдії = ігровий) — по одному запиту на людину, з кешем
   // на час запиту; без DISCORD_GUILD_ID — глобальне ім'я або юзернейм.
@@ -1047,9 +1048,18 @@ async function rbReactions(db: SupabaseClient): Promise<RbReactionsResult> {
       return { ok: true, version: FUNCTION_VERSION, poll: null, groups, warnings: ['Пост збору видалено в Discord — створи новий.'] };
     }
     if (!r.ok) throw await discordError(`Реакції «${c.name}»`, r);
-    for (const u of (await r.json()) as DiscordUser[]) {
+    const users = (await r.json()) as DiscordUser[];
+    for (const u of users) {
       if (u.bot) continue;
       groups[i].people.push({ id: u.id, name: await nameOf(u) });
+    }
+    // Стартової реакції бота нема (не вдалося поставити при створенні або
+    // хтось зняв) — ставимо зараз, інакше людям нема на що натискати.
+    if (!users.some((u) => u.bot)) {
+      const rr = await discord('PUT', reactionUrl(poll.channel_id, poll.message_id, c.emoji.reaction, '/@me'), undefined, botHeaders());
+      if (!rr.ok && rr.status !== 204) {
+        warnings.push(`Бот не зміг поставити реакцію «${c.name}»: Discord відповів ${rr.status} — ${(await rr.text().catch(() => '')).slice(0, 200)}`);
+      }
     }
   }
 
@@ -1058,7 +1068,7 @@ async function rbReactions(db: SupabaseClient): Promise<RbReactionsResult> {
     version: FUNCTION_VERSION,
     poll: { messageId: poll.message_id, channelId: poll.channel_id, postedAt: poll.posted_at, url: rbPollUrl(poll) },
     groups,
-    warnings: [],
+    warnings,
   };
 }
 
