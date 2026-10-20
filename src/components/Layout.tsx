@@ -21,6 +21,7 @@ import NewbiesPage from '../pages/NewbiesPage';
 import PlayersPage from '../pages/PlayersPage';
 import ActivityPage from '../pages/ActivityPage';
 import R8Page from '../pages/R8Page';
+import RbPage from '../pages/RbPage';
 import DsEventsPage from '../pages/DsEventsPage';
 import AdminPage from '../pages/AdminPage';
 
@@ -82,6 +83,7 @@ export default function Layout() {
   else if (route.name === 'players') page = <PlayersPage />;
   else if (route.name === 'activity') page = <ActivityPage />;
   else if (route.name === 'r8') page = <R8Page />;
+  else if (route.name === 'rb') page = <RbPage />;
   else if (route.name === 'events') page = <DsEventsPage />;
   else if (route.name === 'admin') page = <AdminPage />;
 

@@ -753,3 +753,40 @@ html[data-theme='light'] .date-nav input[type='date'] {
   background-color: rgba(122, 15, 15, 0.04);
   color-scheme: light;
 }
+
+/* =========================================================
+   РБ (/rb) — блок-прев'ю розподілу, який копіюють як картинку
+   (html-to-image). Лише текст, без інпутів — щоб знімок був чистим.
+   ========================================================= */
+.rb-print {
+  display: inline-block;
+  min-width: 320px;
+  max-width: 100%;
+  padding: 18px 22px 20px;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+}
+.rb-print-head { margin-bottom: 12px; }
+.rb-print-head .eyebrow { margin-bottom: 4px; }
+.rb-print-head h3 { margin: 0; font-size: 20px; }
+.rb-print-table { display: grid; gap: 0; }
+.rb-print-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(130px, 1fr) minmax(130px, 1fr);
+  gap: 18px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.rb-print-row:last-child { border-bottom: none; }
+.rb-print-row-head {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+  font-weight: 700;
+  border-bottom: 1px solid var(--line-2);
+}
+.rb-print-boss { font-weight: 700; color: var(--accent-3); }

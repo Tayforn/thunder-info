@@ -19,12 +19,13 @@ export type Route =
   | { name: 'players' }
   | { name: 'activity' }
   | { name: 'r8' }
+  | { name: 'rb' }
   | { name: 'events' }
   | { name: 'admin' };
 
 /** Єдине джерело списку маршрутів — використовується і тут (парсинг URL),
  * і в Layout для делегованих [data-goto]-кліків. */
-export const ROUTE_NAMES: Route['name'][] = ['home', 'farm', 'newbies', 'players', 'activity', 'r8', 'events', 'admin'];
+export const ROUTE_NAMES: Route['name'][] = ['home', 'farm', 'newbies', 'players', 'activity', 'r8', 'rb', 'events', 'admin'];
 
 function parsePath(): Route {
   let p = location.pathname;
