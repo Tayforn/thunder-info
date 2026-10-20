@@ -76,7 +76,16 @@ function CopyableNick({ nickname }: { nickname: string }) {
   );
 }
 
-const PLACE_ICON: Record<1 | 2 | 3, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+/** Українська множина для "N перемог" (1 — перемога, 2-4 — перемоги, 5+ — перемог). */
+function pluralWins(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'перемога';
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return 'перемоги';
+  return 'перемог';
+}
+
+const hallOfFameMax = Math.max(...HALL_OF_FAME.map((r) => r.wins));
 
 export default function HomePage() {
   const [rows, setRows] = useState<GearFarmRow[] | null>(null);
@@ -253,17 +262,24 @@ export default function HomePage() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>🏆 Останній турнір</h3>
-          <p className="hint" style={{ margin: '0 0 10px' }}>
-            {LATEST_TOURNAMENT.name} · {LATEST_TOURNAMENT.dateLabel}
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-            {LATEST_TOURNAMENT.podium.map((p) => (
-              <div key={p.place} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>{PLACE_ICON[p.place]}</span>
-                <strong>{p.nickname}</strong>
-              </div>
-            ))}
+          <p className="hint" style={{ margin: '0 0 2px' }}>Останній турнір</p>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>{LATEST_TOURNAMENT.name}</h3>
+          <p className="hint" style={{ margin: '0 0 10px' }}>{LATEST_TOURNAMENT.dateLabel}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14, alignItems: 'end' }}>
+            {([2, 1, 3] as const).map((place) => {
+              const p = LATEST_TOURNAMENT.podium.find((x) => x.place === place);
+              if (!p) return <div key={place} />;
+              const isChamp = place === 1;
+              return (
+                <div key={place} className={'podium-place' + (isChamp ? ' champion' : '')}>
+                  <div className={'rank-circle' + (isChamp ? ' rank-1' : '')}>{place}</div>
+                  <div className="hint" style={{ margin: '0 0 2px', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
+                    {isChamp ? 'Чемпіон' : `${place} місце`}
+                  </div>
+                  <strong style={{ fontSize: isChamp ? 15 : 13, wordBreak: 'break-word' }}>{p.nickname}</strong>
+                </div>
+              );
+            })}
           </div>
           <a href={LATEST_TOURNAMENT.bracketUrl} target="_blank" rel="noopener" className="link">
             Сітка й результати →
@@ -273,11 +289,21 @@ export default function HomePage() {
         <div className="card">
           <h3 style={{ marginTop: 0 }}>🎖️ Зал слави</h3>
           <p className="hint" style={{ margin: '0 0 10px' }}>Перемоги за всі турніри сервера</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
             {HALL_OF_FAME.map((r) => (
-              <div key={r.nickname} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span>{r.rank}. {r.nickname}</span>
-                <span className="badge mute">{r.wins} {r.wins === 1 ? 'перемога' : 'перемоги'}</span>
+              <div key={r.nickname} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className={'rank-circle' + (r.rank === 1 ? ' rank-1' : '')}>{r.rank}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <span>{r.nickname}</span>
+                    <span className="hint" style={{ flex: '0 0 auto' }}>
+                      {r.wins} {pluralWins(r.wins)}
+                    </span>
+                  </div>
+                  <div className="rank-bar-track">
+                    <div className="rank-bar-fill" style={{ width: `${(r.wins / hallOfFameMax) * 100}%` }} />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
