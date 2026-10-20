@@ -238,7 +238,7 @@ export async function fetchDiscordPostState(): Promise<DiscordPostState | null> 
 /** Версія Edge Function discord-events, з якою сумісна ця сторінка (той
  * самий рядок, що FUNCTION_VERSION у supabase/functions/discord-events/index.ts —
  * міняти разом). Сторінка попереджає, якщо на Supabase задеплоєна інша. */
-export const DISCORD_FN_VERSION = '2026-10-20.rb';
+export const DISCORD_FN_VERSION = '2026-10-21.rb2';
 
 export interface SyncResult {
   /** FUNCTION_VERSION функції; відсутній у версіях до 2026-10-12.images. */

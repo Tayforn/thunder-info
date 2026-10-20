@@ -50,7 +50,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /** Міняти разом з DISCORD_FN_VERSION у src/data/events.ts при кожній зміні
  * функції — сторінка «ДС Евенти» попередить, якщо задеплоєна стара. */
-const FUNCTION_VERSION = '2026-10-20.rb';
+const FUNCTION_VERSION = '2026-10-21.rb2';
 const TZ = 'Europe/Kyiv';
 const WEEKDAYS_FULL = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота'];
 const WEEKDAYS_SHORT = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -261,10 +261,21 @@ function messageUrl(messageId: string): string {
   return u.toString();
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** 429 (rate limit) — чекаємо retry_after і повторюємо, до 3 разів: реакції
+ * можна ставити ~1 на 250 мс, десяток поспіль у ліміт не влазить. */
 async function discord(method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT', url: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<Response> {
   const headers: Record<string, string> = { ...extraHeaders };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  return await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (r.status !== 429 || attempt >= 3) return r;
+    const info = (await r.json().catch(() => ({}))) as { retry_after?: number };
+    const headerSec = Number(r.headers.get('retry-after'));
+    const waitMs = Math.min(10_000, Math.ceil((info.retry_after ?? (Number.isFinite(headerSec) ? headerSec : 1)) * 1000) + 100);
+    await sleep(waitMs);
+  }
 }
 
 async function discordError(prefix: string, r: Response): Promise<HttpError> {
@@ -985,7 +996,8 @@ async function createRbPoll(db: SupabaseClient): Promise<RbPostResult> {
   const msg = (await r.json()) as { id: string; channel_id: string };
   const warnings: string[] = [];
 
-  for (const c of classes) {
+  for (const [i, c] of classes.entries()) {
+    if (i > 0) await sleep(300); // ліміт Discord на реакції
     const rr = await discord('PUT', reactionUrl(msg.channel_id, msg.id, c.emoji.reaction, '/@me'), undefined, botHeaders());
     if (!rr.ok && rr.status !== 204) {
       warnings.push(`Реакція «${c.name}» (${c.emoji.display}): Discord відповів ${rr.status} — ${(await rr.text().catch(() => '')).slice(0, 200)}`);
