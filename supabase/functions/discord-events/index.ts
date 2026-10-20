@@ -13,6 +13,12 @@
 //   POST /discord-events/test-ping {eventId}
 //                                 → надіслати пінг евента зараз (поза вікном
 //                                   і позначками); справжній пінг не зачіпає.
+//   POST /discord-events/rb-post  → пост «Збір на РБ» з реакціями-класами
+//                                   (вебхук + бот ставить емодзі); старий
+//                                   пост збору прибирається.
+//   GET  /discord-events/rb-reactions
+//                                 → хто відмітився під постом збору, по
+//                                   класах, із серверними ніками (бот).
 //
 // З ботом (DISCORD_BOT_TOKEN + DISCORD_GUILD_ID) sync ще й веде «Події»
 // сервера (Scheduled Events): по одній на кожен евент з часом на найближчі
@@ -43,7 +49,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /** Міняти разом з DISCORD_FN_VERSION у src/data/events.ts при кожній зміні
  * функції — сторінка «ДС Евенти» попередить, якщо задеплоєна стара. */
-const FUNCTION_VERSION = '2026-10-12.images';
+const FUNCTION_VERSION = '2026-10-20.rb';
 const TZ = 'Europe/Kyiv';
 const WEEKDAYS_FULL = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота'];
 const WEEKDAYS_SHORT = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -794,6 +800,256 @@ async function sync(db: SupabaseClient): Promise<SyncResult> {
 }
 
 // ---------------------------------------------------------
+// Збір на РБ (сторінка /rb): окремий пост у тому ж каналі з реакціями-
+// класами. Пост створює вебхук (?wait=true → id і channel_id), стартові
+// емодзі ставить бот, він же читає, хто натиснув (вебхук реакцій не бачить).
+// Один активний пост (discord_rb_poll, id = 1): новий збір → новий пост, а
+// попередній прибирається, щоб у каналі не копичились. Зіставлення з
+// ростером сайту свідомо немає — нік беремо з Discord (серверний, якщо є
+// DISCORD_GUILD_ID), клас — з емодзі. Яке емодзі який клас — поле
+// classes.rb_emoji (Адмінка → Приоритетність класів); у пості й реакціях
+// беруть участь лише класи, де воно задане.
+// ---------------------------------------------------------
+
+interface RbClassRow {
+  id: string;
+  name: string;
+  rb_emoji: string | null;
+  sort_order: number;
+}
+
+/** reaction — у форматі, який приймає …/reactions/{emoji} (кастомне:
+ * `name:id`, юнікод — сам символ); display — як писати в тексті поста. */
+interface RbEmoji {
+  reaction: string;
+  display: string;
+}
+
+/** Адмін вставляє будь-що з: назву кастомного емодзі сервера
+ * (`ClassIcon_Assassin` або `:ClassIcon_Assassin:` — id знайдемо самі),
+ * `<:name:id>` / `<a:name:id>` (так Discord показує емодзі після `\:name:`),
+ * `name:id`, лише `id`, або звичайний юнікод-емодзі. Для кастомного Discord
+ * звіряє лише id — назва довільна. Повертає `{ name }`, якщо id ще треба
+ * знайти серед емодзі сервера. */
+function parseRbEmoji(raw: string | null): RbEmoji | { name: string } | null {
+  const s = (raw ?? '').trim();
+  if (!s) return null;
+  let m = /^<(a?):([\w~]+):(\d+)>$/.exec(s);
+  if (m) return { reaction: `${m[2]}:${m[3]}`, display: s };
+  m = /^([\w~]+):(\d+)$/.exec(s);
+  if (m) return { reaction: s, display: `<:${m[1]}:${m[2]}>` };
+  if (/^\d{15,25}$/.test(s)) return { reaction: `e:${s}`, display: `<:e:${s}>` };
+  m = /^:?([\w~]{2,32}):?$/.exec(s);
+  if (m) return { name: m[1] };
+  return { reaction: s, display: s };
+}
+
+interface RbClass {
+  id: string;
+  name: string;
+  emoji: RbEmoji;
+}
+
+interface GuildEmoji {
+  id: string;
+  name: string;
+  animated?: boolean;
+}
+
+/** Емодзі сервера (бот): назва → id, без урахування регістру. */
+async function loadGuildEmojis(): Promise<Map<string, GuildEmoji>> {
+  if (!DISCORD_GUILD_ID) throw new HttpError(500, 'Емодзі задано назвою, але DISCORD_GUILD_ID не заданий — встав `<:назва:id>` або задай ID сервера (DISCORD.md, крок 6).');
+  const r = await discord('GET', `${DISCORD_API}/guilds/${DISCORD_GUILD_ID}/emojis`, undefined, botHeaders());
+  if (!r.ok) throw await discordError('Емодзі сервера', r);
+  const list = (await r.json()) as GuildEmoji[];
+  return new Map(list.map((e) => [e.name.toLowerCase(), e]));
+}
+
+async function loadRbClasses(db: SupabaseClient): Promise<RbClass[]> {
+  const { data, error } = await db.from('classes').select('id, name, rb_emoji, sort_order').not('rb_emoji', 'is', null).order('sort_order');
+  if (error) throw new HttpError(500, `classes.rb_emoji: ${error.message} (міграція 0010 виконана?)`);
+  const classes: RbClass[] = [];
+  let guildEmojis: Map<string, GuildEmoji> | null = null;
+  for (const c of (data ?? []) as RbClassRow[]) {
+    const parsed = parseRbEmoji(c.rb_emoji);
+    if (!parsed) continue;
+    if ('name' in parsed) {
+      guildEmojis ??= await loadGuildEmojis();
+      const e = guildEmojis.get(parsed.name.toLowerCase());
+      if (!e) throw new HttpError(400, `Емодзі «${parsed.name}» (клас «${c.name}») не знайдено серед емодзі сервера — перевір назву в Адмінці.`);
+      classes.push({ id: c.id, name: c.name, emoji: { reaction: `${e.name}:${e.id}`, display: `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>` } });
+    } else {
+      classes.push({ id: c.id, name: c.name, emoji: parsed });
+    }
+  }
+  if (classes.length === 0) throw new HttpError(400, 'Жодному класу не задано емодзі РБ — Адмінка → Приоритетність класів → «Емодзі РБ».');
+  return classes;
+}
+
+interface RbPollRow {
+  message_id: string;
+  channel_id: string;
+  posted_at: string;
+}
+
+interface DiscordUser {
+  id: string;
+  username: string;
+  global_name?: string | null;
+  bot?: boolean;
+}
+
+interface RbReactor {
+  id: string;
+  name: string;
+}
+
+interface RbPostResult {
+  ok: true;
+  version: string;
+  messageId: string;
+  postedAt: string;
+  warnings: string[];
+}
+
+interface RbGroup {
+  classId: string;
+  className: string;
+  emoji: string;
+  people: RbReactor[];
+}
+
+interface RbReactionsResult {
+  ok: true;
+  version: string;
+  poll: { messageId: string; channelId: string; postedAt: string; url: string } | null;
+  groups: RbGroup[];
+  warnings: string[];
+}
+
+function requireBot(): void {
+  if (!DISCORD_BOT_TOKEN) throw new HttpError(500, 'DISCORD_BOT_TOKEN не заданий — реакції ставить і читає лише бот (DISCORD.md, крок 5).');
+}
+
+function reactionUrl(channelId: string, messageId: string, emoji: string, suffix = ''): string {
+  return `${DISCORD_API}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}${suffix}`;
+}
+
+function rbPollUrl(p: RbPollRow): string {
+  return `https://discord.com/channels/${DISCORD_GUILD_ID || '@me'}/${p.channel_id}/${p.message_id}`;
+}
+
+interface RbSettings {
+  post_text: string;
+  ping: string;
+}
+
+/** Текст за замовчуванням — той самий, що сторінка показує як placeholder. */
+const RB_DEFAULT_TEXT = '⚔ **Збір на РБ** — {date}\nВідміться реакцією, хто онлайн:\n{classes}';
+
+async function loadRbSettings(db: SupabaseClient): Promise<RbSettings> {
+  const { data, error } = await db.from('discord_rb_settings').select('post_text, ping').eq('id', 1).maybeSingle();
+  if (error) throw new HttpError(500, `discord_rb_settings: ${error.message} (міграція 0010 виконана?)`);
+  const row = (data ?? null) as RbSettings | null;
+  return { post_text: row?.post_text ?? '', ping: row?.ping ?? '' };
+}
+
+/** Текст поста збору: шаблон адміна (або стандартний) з підставленими
+ * {date} і {classes}; без {classes} у шаблоні легенда емодзі додається в
+ * кінець — без неї люди не знають, що тиснути. Пінг — на початку. */
+function buildRbPost(now: KyivNow, classes: RbClass[], s: RbSettings): WebhookPayload {
+  const legend = classes.map((c) => `${c.emoji.display} — ${c.name}`).join('  ·  ');
+  let text = (s.post_text.trim() || RB_DEFAULT_TEXT).replace(/\{date\}/g, `${WEEKDAYS_FULL[now.weekday]}, ${dateLabel(now.date)}`);
+  text = text.includes('{classes}') ? text.replace(/\{classes\}/g, legend) : `${text}\n${legend}`;
+  const ping = s.ping.trim();
+  if (ping.toLowerCase().replace(/^@/, '') === 'none') return { content: text.slice(0, 2000), allowed_mentions: { parse: [] } };
+  const { mention, allowed } = pingTarget({ ping_role_id: ping || null } as EventRow);
+  return { content: `${mention} ${text}`.slice(0, 2000), allowed_mentions: allowed };
+}
+
+async function loadRbPoll(db: SupabaseClient): Promise<RbPollRow | null> {
+  const { data, error } = await db.from('discord_rb_poll').select('message_id, channel_id, posted_at').eq('id', 1).maybeSingle();
+  if (error) throw new HttpError(500, `discord_rb_poll: ${error.message} (міграція 0010 виконана?)`);
+  return (data ?? null) as RbPollRow | null;
+}
+
+async function createRbPoll(db: SupabaseClient): Promise<RbPostResult> {
+  requireBot();
+  const classes = await loadRbClasses(db);
+  const settings = await loadRbSettings(db);
+  const payload = buildRbPost(kyivNow(), classes, settings);
+
+  const r = await discord('POST', createUrl(), payload);
+  if (!r.ok) throw await discordError('Створення поста збору', r);
+  const msg = (await r.json()) as { id: string; channel_id: string };
+  const warnings: string[] = [];
+
+  for (const c of classes) {
+    const rr = await discord('PUT', reactionUrl(msg.channel_id, msg.id, c.emoji.reaction, '/@me'), undefined, botHeaders());
+    if (!rr.ok && rr.status !== 204) {
+      warnings.push(`Реакція «${c.name}» (${c.emoji.display}): Discord відповів ${rr.status} — ${(await rr.text().catch(() => '')).slice(0, 200)}`);
+    }
+  }
+
+  const prev = await loadRbPoll(db);
+  if (prev && prev.message_id !== msg.id) {
+    const d = await discord('DELETE', messageUrl(prev.message_id));
+    if (!d.ok && d.status !== 404) warnings.push(`Старий пост збору не видалено: Discord відповів ${d.status}`);
+  }
+
+  const postedAt = new Date().toISOString();
+  const { error } = await db.from('discord_rb_poll').upsert({ id: 1, message_id: msg.id, channel_id: msg.channel_id, posted_at: postedAt });
+  if (error) throw new HttpError(500, `discord_rb_poll upsert: ${error.message} (міграція 0010 виконана?)`);
+  return { ok: true, version: FUNCTION_VERSION, messageId: msg.id, postedAt, warnings };
+}
+
+async function rbReactions(db: SupabaseClient): Promise<RbReactionsResult> {
+  requireBot();
+  const classes = await loadRbClasses(db);
+  const groups: RbGroup[] = classes.map((c) => ({ classId: c.id, className: c.name, emoji: c.emoji.display, people: [] }));
+  const poll = await loadRbPoll(db);
+  if (!poll) return { ok: true, version: FUNCTION_VERSION, poll: null, groups, warnings: [] };
+
+  // Серверний нік (у гільдії = ігровий) — по одному запиту на людину, з кешем
+  // на час запиту; без DISCORD_GUILD_ID — глобальне ім'я або юзернейм.
+  const names = new Map<string, string>();
+  const nameOf = async (u: DiscordUser): Promise<string> => {
+    const cached = names.get(u.id);
+    if (cached) return cached;
+    let name = u.global_name?.trim() || u.username;
+    if (DISCORD_GUILD_ID) {
+      const m = await discord('GET', `${DISCORD_API}/guilds/${DISCORD_GUILD_ID}/members/${u.id}`, undefined, botHeaders());
+      if (m.ok) {
+        const member = (await m.json()) as { nick?: string | null };
+        if (member.nick?.trim()) name = member.nick.trim();
+      }
+    }
+    names.set(u.id, name);
+    return name;
+  };
+
+  for (const [i, c] of classes.entries()) {
+    const r = await discord('GET', reactionUrl(poll.channel_id, poll.message_id, c.emoji.reaction) + '?limit=100', undefined, botHeaders());
+    if (r.status === 404) {
+      return { ok: true, version: FUNCTION_VERSION, poll: null, groups, warnings: ['Пост збору видалено в Discord — створи новий.'] };
+    }
+    if (!r.ok) throw await discordError(`Реакції «${c.name}»`, r);
+    for (const u of (await r.json()) as DiscordUser[]) {
+      if (u.bot) continue;
+      groups[i].people.push({ id: u.id, name: await nameOf(u) });
+    }
+  }
+
+  return {
+    ok: true,
+    version: FUNCTION_VERSION,
+    poll: { messageId: poll.message_id, channelId: poll.channel_id, postedAt: poll.posted_at, url: rbPollUrl(poll) },
+    groups,
+    warnings: [],
+  };
+}
+
+// ---------------------------------------------------------
 // HTTP.
 // ---------------------------------------------------------
 
@@ -840,7 +1096,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
           ? 'test-ping'
           : path.endsWith('/preview')
             ? 'preview'
-            : 'today';
+            : path.endsWith('/rb-post')
+              ? 'rb-post'
+              : path.endsWith('/rb-reactions')
+                ? 'rb-reactions'
+                : 'today';
+
+    if (action === 'rb-post') {
+      if (req.method !== 'POST') throw new HttpError(405, 'rb-post — лише POST.');
+      return json(await createRbPoll(db));
+    }
+    if (action === 'rb-reactions') return json(await rbReactions(db));
 
     if (action === 'sync' || action === 'clean' || action === 'test-ping') {
       if (req.method !== 'POST') throw new HttpError(405, `${action} — лише POST.`);

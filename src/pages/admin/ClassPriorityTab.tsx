@@ -5,12 +5,28 @@ import { createClass, deleteClass, fetchClasses, updateClass } from '../../data/
 import type { ClassRow } from '../../data/types';
 import { classBadgeVariant } from '../../data/types';
 
-const COLUMNS = '1fr 140px 170px 90px';
+const COLUMNS = '1fr 130px 150px 210px 90px';
 
 function TextInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   useEffect(() => setValue(initial), [initial]);
   return <input type="text" value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => value.trim() && value !== initial && onSave(value)} />;
+}
+
+/** Емодзі реакції для збору на РБ; порожнє = клас у зборі не бере участі. */
+function EmojiInput({ initial, onSave }: { initial: string | null; onSave: (v: string | null) => void }) {
+  const [value, setValue] = useState(initial ?? '');
+  useEffect(() => setValue(initial ?? ''), [initial]);
+  return (
+    <input
+      type="text"
+      value={value}
+      placeholder="ClassIcon_Assassin або 🗡️"
+      title="Назва кастомного емодзі сервера (як у списку Емодзі в налаштуваннях сервера, без двокрапок), або <:назва:id>, або звичайний емодзі."
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => value.trim() !== (initial ?? '') && onSave(value.trim() || null)}
+    />
+  );
 }
 
 function CoefInput({ initial, onSave }: { initial: number; onSave: (v: number) => void }) {
@@ -71,10 +87,11 @@ export default function ClassPriorityTab() {
       <h3>Приоритетність класів</h3>
       <p className="hint" style={{ marginBottom: 12 }}>
         Коефіцієнт множиться на бали активності при щоденному нарахуванні. За замовчуванням — 1 (звичайний пріоритет).
+        «Емодзі РБ» — реакція під постом збору на РБ (сторінка «РБ»): класи без емодзі в зборі не беруть участі.
       </p>
       <AdminTable
         columns={COLUMNS}
-        header={['Клас', 'Коефіцієнт', 'Підсвітка', '']}
+        header={['Клас', 'Коефіцієнт', 'Підсвітка', 'Емодзі РБ', '']}
         rows={classes}
         keyFn={(c) => c.id}
         emptyLabel="Класів ще немає."
@@ -82,6 +99,7 @@ export default function ClassPriorityTab() {
           <TextInput key="name" initial={c.name} onSave={(v) => updateClass(c.id, { name: v }).then(reload).catch(reportError)} />,
           <CoefInput key="coef" initial={c.coef} onSave={(v) => updateClass(c.id, { coef: v }).then(reload).catch(reportError)} />,
           <VariantBadge key="badge" coef={c.coef} />,
+          <EmojiInput key="emoji" initial={c.rbEmoji} onSave={(v) => updateClass(c.id, { rbEmoji: v }).then(reload).catch(reportError)} />,
           <button
             key="del"
             type="button"

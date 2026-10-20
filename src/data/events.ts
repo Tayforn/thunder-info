@@ -238,7 +238,7 @@ export async function fetchDiscordPostState(): Promise<DiscordPostState | null> 
 /** Версія Edge Function discord-events, з якою сумісна ця сторінка (той
  * самий рядок, що FUNCTION_VERSION у supabase/functions/discord-events/index.ts —
  * міняти разом). Сторінка попереджає, якщо на Supabase задеплоєна інша. */
-export const DISCORD_FN_VERSION = '2026-10-12.images';
+export const DISCORD_FN_VERSION = '2026-10-20.rb';
 
 export interface SyncResult {
   /** FUNCTION_VERSION функції; відсутній у версіях до 2026-10-12.images. */
@@ -276,8 +276,10 @@ export function testDiscordPing(eventId: string): Promise<{ event: string; menti
   return invokeDiscord('test-ping', 'Не вдалося надіслати тестовий пінг.', { eventId });
 }
 
-async function invokeDiscord<T>(action: 'sync' | 'clean' | 'test-ping', fallback: string, body: Record<string, unknown> = {}): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T>(`discord-events/${action}`, { method: 'POST', body });
+/** Виклик Edge Function discord-events від імені адміна; текст помилки —
+ * з JSON-відповіді функції, а не загальний від supabase-js. */
+export async function invokeDiscord<T>(action: string, fallback: string, body?: Record<string, unknown>, method: 'POST' | 'GET' = 'POST'): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>(`discord-events/${action}`, method === 'GET' ? { method } : { method, body: body ?? {} });
   if (error) {
     let message = error.message || fallback;
     const ctx = (error as { context?: unknown }).context;
