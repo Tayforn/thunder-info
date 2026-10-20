@@ -57,7 +57,9 @@ function RbManager() {
   const [selectedClassIds, setSelectedClassIds] = useState<Set<string>>(new Set());
   const defaultsApplied = useRef(false);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
-  const [selectedBossIds, setSelectedBossIds] = useState<Set<string>>(new Set());
+  const [selectedBossIds, setSelectedBossIds] = useState<Set<string>>(
+    () => new Set(RAID_BOSSES.filter((b) => b.defaultOn).map((b) => b.id)),
+  );
   const [slots, setSlots] = useState<Record<string, Slot>>({});
   const [copied, setCopied] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
