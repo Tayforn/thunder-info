@@ -31,7 +31,10 @@ import { fetchClasses } from '../data/classes';
 import { DISCORD_FN_VERSION } from '../data/events';
 import { fetchPlayers } from '../data/players';
 import { RAID_BOSSES } from '../data/raidBosses';
-import { RB_DEFAULT_TEXT, createRbPoll, fetchRbReactions, fetchRbSettings, saveRbSettings, type RbReactionsResult, type RbSettings } from '../data/rbPoll';
+import {
+  RB_DEFAULT_TEXT, createRbPoll, deleteRbPoll, fetchRbReactions, fetchRbSettings, saveRbSettings,
+  type RbReactionsResult, type RbSettings,
+} from '../data/rbPoll';
 import type { ClassRow, Player } from '../data/types';
 
 type Kind = 'sin' | 'tank' | 'seeker' | 'other';
@@ -223,7 +226,7 @@ function RbManager() {
   // Discord.
   const [reactions, setReactions] = useState<RbReactionsResult | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
-  const [busy, setBusy] = useState<'post' | 'fetch' | null>(null);
+  const [busy, setBusy] = useState<'post' | 'fetch' | 'delete' | null>(null);
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [extras, setExtras] = useState<{ groupKey: string; person: Person }[]>([]);
   const [settings, setSettings] = useState<RbSettings | null>(null);
@@ -292,6 +295,22 @@ function RbManager() {
       await loadReactions();
     } catch (e) {
       setActionErr(errorMessage(e, 'Не вдалося створити пост збору.'));
+      setBusy(null);
+    }
+  };
+
+  const removePoll = async () => {
+    if (!confirm('Прибрати пост збору з Discord? Реакції під ним пропадуть.')) return;
+    setBusy('delete');
+    setActionErr(null);
+    try {
+      await deleteRbPoll();
+      setSlots({});
+      setExcludedIds(new Set());
+      setExtras([]);
+      await loadReactions();
+    } catch (e) {
+      setActionErr(errorMessage(e, 'Не вдалося прибрати пост збору.'));
       setBusy(null);
     }
   };
@@ -448,6 +467,11 @@ function RbManager() {
             <button type="button" className={'btn btn-sm ' + (settingsOpen ? 'btn-primary' : 'btn-ghost')} onClick={() => setSettingsOpen((v) => !v)}>
               ⚙ Текст і пінг
             </button>
+            {poll && (
+              <button type="button" className="btn btn-bad btn-sm" disabled={busy !== null} onClick={removePoll}>
+                {busy === 'delete' ? 'Прибираю…' : '🗑 Прибрати пост'}
+              </button>
+            )}
             <span className="hint">
               {poll ? (
                 <>
@@ -456,11 +480,14 @@ function RbManager() {
                 </>
               ) : reactions ? (
                 'Поста збору ще немає — створи, і люди відмітяться реакціями.'
-              ) : (
+              ) : busy === 'fetch' ? (
                 'Читаю реакції…'
+              ) : (
+                'Реакції не прочитано — див. помилку нижче.'
               )}
             </span>
           </div>
+          {actionErr && <p className="form-err" style={{ marginBottom: 12 }}>{actionErr}</p>}
           {settingsOpen && (settings ? <PostSettings initial={settings} onSaved={setSettings} /> : <p className="hint">Читаю налаштування…</p>)}
           {poll && discordGroups.length === 0 && <p className="hint">Жодному класу не задано емодзі — Адмінка → Приоритетність класів.</p>}
           {poll && discordGroups.length > 0 && (
@@ -524,7 +551,7 @@ function RbManager() {
         <span className="hint">На боса: 1 Сін + 1 Танк/Сікер по черзі з відмічених онлайн; хто не влігся — в «Резерві».</span>
       </div>
 
-      {actionErr && <p className="form-err" style={{ marginBottom: 16 }}>{actionErr}</p>}
+      {actionErr && source !== 'discord' && <p className="form-err" style={{ marginBottom: 16 }}>{actionErr}</p>}
 
       {selectedBosses.length > 0 && (
         <div className="card" style={{ marginBottom: 20 }}>

@@ -65,6 +65,11 @@ export function createRbPoll(): Promise<RbPostResult> {
   return invokeDiscord<RbPostResult>('rb-post', 'Не вдалося створити пост збору в Discord.');
 }
 
+/** Прибрати активний пост збору з каналу; deleted=false — його вже не було. */
+export function deleteRbPoll(): Promise<{ deleted: boolean }> {
+  return invokeDiscord<{ deleted: boolean }>('rb-delete', 'Не вдалося прибрати пост збору.');
+}
+
 export function fetchRbReactions(): Promise<RbReactionsResult> {
   return invokeDiscord<RbReactionsResult>('rb-reactions', 'Не вдалося прочитати реакції з Discord.', undefined, 'GET');
 }
