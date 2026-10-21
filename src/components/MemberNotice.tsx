@@ -3,20 +3,30 @@
 // закриті й на сервері — тут просто пояснення й кнопка входу.
 // =========================================================
 
+import { IcoDiscord, IcoLock } from './Icons';
+
 export default function MemberNotice({ onLogin }: { onLogin: () => void }) {
   return (
-    <div className="card" style={{ textAlign: 'center', padding: '32px 20px', maxWidth: 520, margin: '24px auto' }}>
-      <h2 style={{ marginTop: 0 }}>Розділ для своїх</h2>
-      <p className="hint" style={{ margin: '0 auto 18px', maxWidth: 400 }}>
-        Цей розділ бачать лише учасники сервера клану. Увійди через Discord — якщо ти в клані
-        й маєш потрібну роль, доступ відкриється автоматично.
-      </p>
-      <button type="button" className="btn btn-primary btn-lg" onClick={onLogin}>
-        Увійти через Discord
-      </button>
-      <p className="hint" style={{ margin: '16px 0 0', fontSize: 12 }}>
-        Головна та «Р8 фарм» доступні всім і без входу.
-      </p>
+    <div className="auth-wrap">
+      <div className="panel auth-card">
+        <div className="panel-head">
+          <h3><IcoLock /> Розділ для своїх</h3>
+        </div>
+        <div className="panel-body" style={{ textAlign: 'center' }}>
+          <img className="auth-crest" src={import.meta.env.BASE_URL + 'assets/favicon-180.png'} alt="" />
+          <div className="auth-title">
+            <h2>Увійди через Discord</h2>
+            <p>
+              Цей розділ бачать лише учасники сервера клану. Якщо ти в клані й маєш потрібну роль — доступ
+              відкриється автоматично.
+            </p>
+          </div>
+          <button type="button" className="btn btn-discord btn-lg" onClick={onLogin}>
+            <IcoDiscord /> Увійти через Discord
+          </button>
+          <p className="hint">Головна та «Р8 фарм» доступні всім і без входу.</p>
+        </div>
+      </div>
     </div>
   );
 }

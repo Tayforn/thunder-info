@@ -9,6 +9,7 @@ import PageMeta from '../app/PageMeta';
 import { errorMessage, reportError } from '../app/errorMessage';
 import { formatPrice, formatPriceExact } from '../app/formatPrice';
 import AdminGate from '../components/AdminGate';
+import { IcoEdit, IcoPlus, IcoSword, IcoTrash } from '../components/Icons';
 import { fetchLootItems } from '../data/lootItems';
 import {
   createGearItem, deleteGearItem, fetchGearItemComponents, fetchGearItems,
@@ -42,6 +43,9 @@ function GearForm({
   const updateComp = (i: number, patch: Partial<DraftComponent>) =>
     setComps((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
+  const lootById = new Map(lootOptions.map((l) => [l.id, l]));
+  const draftPrice = comps.reduce((sum, c) => sum + c.quantity * (lootById.get(c.lootItemId)?.price ?? 0), 0);
+
   const save = async () => {
     if (!name.trim()) return;
     setBusy(true);
@@ -60,47 +64,66 @@ function GearForm({
   };
 
   return (
-    <div className="card" style={{ marginBottom: 20 }}>
-      <div className="field-row">
-        <label className="field">
-          <span>Назва шмотки</span>
-          <input type="text" value={name} placeholder="Р8 зброя" onChange={(e) => setName(e.target.value)} />
-        </label>
-      </div>
-
-      <h4 style={{ marginBottom: 8 }}>Склад (валютні айтеми з «Ціна лута»)</h4>
-      {comps.length === 0 && <p className="hint">Компонентів ще немає.</p>}
-      {comps.map((c, i) => (
-        <div key={i} className="field-row" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
-          <label className="field" style={{ flex: '2 1 240px' }}>
-            <span>Айтем</span>
-            <select value={c.lootItemId} onChange={(e) => updateComp(i, { lootItemId: e.target.value })}>
-              {lootOptions.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field" style={{ flex: '0 0 120px' }}>
-            <span>Кількість</span>
-            <input type="number" min={1} value={c.quantity} onChange={(e) => updateComp(i, { quantity: Number(e.target.value) })} />
-          </label>
-          <button type="button" className="btn btn-bad btn-sm" onClick={() => removeComp(i)}>Прибрати</button>
+    <div className="panel accent">
+      <div className="panel-head">
+        <h3>{initial ? <><IcoEdit /> Редагування шмотки</> : <><IcoPlus /> Нова шмотка</>}</h3>
+        <span className="panel-sub">склад — валютні айтеми з «Ціна лута»</span>
+        <div className="panel-actions">
+          <span className="badge accent" title={formatPriceExact(draftPrice)}>ціна {formatPrice(draftPrice)}</span>
         </div>
-      ))}
-      <button type="button" className="btn btn-ghost btn-sm" disabled={comps.length >= lootOptions.length} onClick={addComp} style={{ marginBottom: 16 }}>
-        + Додати компонент
-      </button>
+      </div>
+      <div className="panel-body stack">
+        <label className="field" style={{ maxWidth: 420 }}>
+          <span>Назва шмотки</span>
+          <input type="text" value={name} placeholder="Р8 зброя" autoFocus onChange={(e) => setName(e.target.value)} />
+        </label>
 
-      {err && <p className="form-err">{err}</p>}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" className="btn btn-primary" disabled={busy || !name.trim()} onClick={save}>
+        <div className="stack sm">
+          <span className="field"><span>Склад</span></span>
+          {comps.length === 0 && <p className="hint">Компонентів ще немає — додай перший.</p>}
+          {comps.map((c, i) => (
+            <div key={i} className="field-row">
+              <label className="field" style={{ flex: '2 1 240px' }}>
+                <span>Айтем</span>
+                <select value={c.lootItemId} onChange={(e) => updateComp(i, { lootItemId: e.target.value })}>
+                  {lootOptions.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field" style={{ flex: '0 0 110px' }}>
+                <span>Кількість</span>
+                <input type="number" min={1} value={c.quantity} onChange={(e) => updateComp(i, { quantity: Number(e.target.value) })} />
+              </label>
+              <span className="field" style={{ flex: '0 0 110px' }}>
+                <span>Разом</span>
+                <span className="cell-price" style={{ height: 38, display: 'inline-flex', alignItems: 'center' }} title={formatPriceExact(c.quantity * (lootById.get(c.lootItemId)?.price ?? 0))}>
+                  {formatPrice(c.quantity * (lootById.get(c.lootItemId)?.price ?? 0))}
+                </span>
+              </span>
+              <button type="button" className="btn btn-bad btn-sm" style={{ height: 38 }} onClick={() => removeComp(i)}><IcoTrash /> Прибрати</button>
+            </div>
+          ))}
+          <div>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={comps.length >= lootOptions.length} onClick={addComp}>
+              <IcoPlus /> Додати компонент
+            </button>
+          </div>
+        </div>
+
+        {err && <p className="form-err">{err}</p>}
+      </div>
+      <div className="panel-foot" style={{ justifyContent: 'flex-end' }}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Скасувати</button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy || !name.trim()} onClick={save}>
           {busy ? 'Збереження…' : 'Зберегти'}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={onCancel}>Скасувати</button>
       </div>
     </div>
   );
 }
+
+const COLS = 'minmax(150px, 1fr) minmax(200px, 1.4fr) 110px 200px';
 
 function R8Manager() {
   const [lootItems, setLootItems] = useState<LootItem[]>([]);
@@ -125,72 +148,96 @@ function R8Manager() {
   const currencyOptions = lootItems.filter((l) => !l.isGearStone);
   const lootById = new Map(lootItems.map((l) => [l.id, l]));
 
+  const compsOf = (gearId: string) => components.filter((c) => c.gearItemId === gearId);
   const priceOf = (gearId: string) =>
-    components.filter((c) => c.gearItemId === gearId).reduce((sum, c) => sum + c.quantity * (lootById.get(c.lootItemId)?.price ?? 0), 0);
+    compsOf(gearId).reduce((sum, c) => sum + c.quantity * (lootById.get(c.lootItemId)?.price ?? 0), 0);
+  const setPrice = gearItems.reduce((s, g) => s + priceOf(g.id), 0);
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>Шмотки Р8</h3>
-        <button type="button" className="btn btn-primary" disabled={currencyOptions.length === 0} onClick={() => setEditing('new')}>
-          + Нова шмотка
-        </button>
-      </div>
+    <div className="stack">
       {currencyOptions.length === 0 && (
-        <p className="hint" style={{ marginBottom: 16 }}>
-          Спершу додай хоча б один не-камінний айтем у вкладці «Ціна лута» в Адмінці.
-        </p>
+        <div className="notice warn">
+          <span className="grow">Спершу додай хоча б один не-камінний айтем у вкладці «Ціна лута» в Адмінці.</span>
+          <div className="notice-acts"><button type="button" className="btn btn-ghost btn-xs" data-goto="admin">В Адмінку</button></div>
+        </div>
       )}
 
       {err && <p className="form-err">{err}</p>}
 
       {editing && (
         <GearForm
+          key={editing === 'new' ? 'new' : editing.id}
           lootOptions={currencyOptions}
-          initial={editing === 'new' ? null : { item: editing, components: components.filter((c) => c.gearItemId === editing.id) }}
+          initial={editing === 'new' ? null : { item: editing, components: compsOf(editing.id) }}
           onCancel={() => setEditing(null)}
           onSaved={() => { setEditing(null); reload(); }}
         />
       )}
 
-      {gearItems.length === 0 ? (
-        <p className="hint">Шмоток ще немає.</p>
-      ) : (
-        <div className="rowlist">
-          <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 140px 180px' }}>
-            <span>Назва</span>
-            <span>Ціна</span>
-            <span></span>
+      <div className="panel">
+        <div className="panel-head">
+          <h3><IcoSword /> Шмотки Р8</h3>
+          {gearItems.length > 0 && <span className="badge mute">{gearItems.length}</span>}
+          {gearItems.length > 0 && <span className="panel-sub" title={formatPriceExact(setPrice)}>весь сет — {formatPrice(setPrice)}</span>}
+          <div className="panel-actions">
+            <button type="button" className="btn btn-primary btn-sm" disabled={currencyOptions.length === 0 || editing === 'new'} onClick={() => setEditing('new')}>
+              <IcoPlus /> Нова шмотка
+            </button>
           </div>
-          {gearItems.map((g) => (
-            <div key={g.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 140px 180px' }}>
-              <span>{g.name}</span>
-              <span style={{ fontWeight: 700 }} title={formatPriceExact(priceOf(g.id))}>{formatPrice(priceOf(g.id))}</span>
-              <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(g)}>Редагувати</button>
-                <button
-                  type="button"
-                  className="btn btn-bad btn-sm"
-                  onClick={() => confirm(`Видалити шмотку «${g.name}»?`) && deleteGearItem(g.id).then(reload).catch(reportError)}
-                >
-                  Видалити
-                </button>
-              </span>
-            </div>
-          ))}
         </div>
-      )}
+        <div className="panel-body flush">
+          {gearItems.length === 0 ? (
+            <p className="rowlist-empty">Шмоток ще немає.</p>
+          ) : (
+            <div className="rowlist">
+              <div className="rowlist-head" style={{ gridTemplateColumns: COLS }}>
+                <span>Назва</span>
+                <span>Склад</span>
+                <span className="cell-right">Ціна</span>
+                <span></span>
+              </div>
+              {gearItems.map((g) => (
+                <div key={g.id} className={'rowlist-row' + (editing !== 'new' && editing?.id === g.id ? ' highlight' : '')} style={{ gridTemplateColumns: COLS }}>
+                  <span className="cell-nick"><b>{g.name}</b>{g.note && <small className="hint">{g.note}</small>}</span>
+                  <span className="chips">
+                    {compsOf(g.id).length === 0 && <span className="hint">без компонентів</span>}
+                    {compsOf(g.id).map((c) => (
+                      <span key={c.id} className="chip static" style={{ height: 24, fontSize: 12 }}>
+                        {lootById.get(c.lootItemId)?.name ?? '?'} <b>×{c.quantity}</b>
+                      </span>
+                    ))}
+                  </span>
+                  <span className="cell-price cell-right" title={formatPriceExact(priceOf(g.id))}>{formatPrice(priceOf(g.id))}</span>
+                  <span className="cell-actions">
+                    <button type="button" className="btn btn-ghost btn-xs" onClick={() => setEditing(g)}><IcoEdit /> Редагувати</button>
+                    <button
+                      type="button"
+                      className="btn btn-bad btn-xs"
+                      onClick={() => confirm(`Видалити шмотку «${g.name}»?`) && deleteGearItem(g.id).then(reload).catch(reportError)}
+                    >
+                      <IcoTrash />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function R8Page() {
   return (
-    <div>
+    <div className="page">
       <PageMeta title="Р8 — Thunder" />
-      <div className="section-head">
-        <span className="eyebrow">Гільдія</span>
-        <h2>Шмотки Р8</h2>
+      <div className="page-head">
+        <div className="page-head-text">
+          <span className="eyebrow">Керування</span>
+          <h1>Шмотки Р8</h1>
+          <p>Назва й рецепт кожної шмотки. Ціна рахується з поточних цін лута — її бачать усі на сторінці «Р8 фарм».</p>
+        </div>
       </div>
       <AdminGate>{() => <R8Manager />}</AdminGate>
     </div>

@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
+import { IcoPlus, IcoTrash } from '../../components/Icons';
 import { fetchClasses } from '../../data/classes';
 import { createPlayer, deletePlayer, fetchPlayers, updatePlayer } from '../../data/players';
 import type { ClassRow, Player } from '../../data/types';
 
-const COLUMNS = '1fr 200px 1fr 90px';
+const COLUMNS = 'minmax(160px, 1fr) 190px minmax(160px, 1fr) 60px';
 
 function ClassSelect({ classes, value, onChange }: { classes: ClassRow[]; value: string | null; onChange: (v: string | null) => void }) {
   return (
@@ -69,10 +70,12 @@ export default function PlayersTab() {
   };
 
   return (
-    <div>
-      <h3>Гравці</h3>
+    <div className="stack">
       <AdminTable
+        title="Гравці"
+        hint="бали гравців рахуються з галочок напряму; премії — у календарі на сторінці «Гравці»"
         columns={COLUMNS}
+        minWidth={640}
         header={['Нікнейм', 'Клас', 'Нотатка', '']}
         rows={players}
         keyFn={(p) => p.id}
@@ -81,26 +84,28 @@ export default function PlayersTab() {
           <TextCell key="nick" initial={p.nickname} onSave={(v) => v.trim() && updatePlayer(p.id, { nickname: v }).then(reload).catch(reportError)} />,
           <ClassSelect key="cls" classes={classes} value={p.classId} onChange={(v) => updatePlayer(p.id, { classId: v }).then(reload).catch(reportError)} />,
           <TextCell key="note" initial={p.note ?? ''} placeholder="—" onSave={(v) => updatePlayer(p.id, { note: v || null }).then(reload).catch(reportError)} />,
-          <button
-            key="del"
-            type="button"
-            className="btn btn-bad btn-sm"
-            onClick={() => confirm(`Видалити гравця «${p.nickname}»? Історія відвідуваності теж зникне.`) && deletePlayer(p.id).then(reload).catch(reportError)}
-          >
-            Видалити
-          </button>,
+          <span key="del" className="cell-actions">
+            <button
+              type="button"
+              className="btn btn-bad btn-xs"
+              title="Видалити"
+              onClick={() => confirm(`Видалити гравця «${p.nickname}»? Історія відвідуваності теж зникне.`) && deletePlayer(p.id).then(reload).catch(reportError)}
+            >
+              <IcoTrash />
+            </button>
+          </span>,
         ]}
         addRow={
           <>
-            <label className="field" style={{ flex: '1 1 220px' }}>
+            <label className="field">
               <span>Нікнейм</span>
-              <input type="text" value={newNickname} placeholder="Нікнейм" onChange={(e) => setNewNickname(e.target.value)} />
+              <input type="text" value={newNickname} placeholder="Нікнейм" onChange={(e) => setNewNickname(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
             </label>
-            <label className="field" style={{ flex: '0 0 200px' }}>
+            <label className="field mid">
               <span>Клас</span>
               <ClassSelect classes={classes} value={newClassId} onChange={setNewClassId} />
             </label>
-            <button type="button" className="btn btn-primary" disabled={busy || !newNickname.trim()} onClick={add}>+ Додати</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !newNickname.trim()} onClick={add}><IcoPlus /> Додати</button>
           </>
         }
       />

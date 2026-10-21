@@ -9,22 +9,15 @@
 import { useEffect, useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import { formatPrice, formatPriceExact } from '../app/formatPrice';
-import { copyText } from '../app/clipboard';
 import { fetchLootItems } from '../data/lootItems';
 import { fetchGearItemComponents, fetchGearItems } from '../data/gearItems';
-import { fetchLadderPreview, type LadderPreviewEntry } from '../data/ladderPreview';
-import {
-  CALC_REFINE_URL,
-  HALL_OF_FAME,
-  LADDER_PRIZE_CHESTS,
-  LADDER_URL,
-  LATEST_TOURNAMENT,
-  PAST_TOURNAMENT_600,
-  PVP_URL,
-  RECRUITMENT_OFFICERS,
-} from '../data/community';
 import type { GearItemComponent, LootItem } from '../data/types';
 import { calcFarmWeeks } from '../data/khFarm';
+import { copyText } from '../app/clipboard';
+import { fetchLadderPreview, type LadderPreviewEntry } from '../data/ladderPreview';
+import { CALC_REFINE_URL, LADDER_PRIZE_CHESTS, LADDER_URL, PAST_TOURNAMENT_600, RECRUITMENT_OFFICERS } from '../data/community';
+import { IcoBolt, IcoBook, IcoCheck, IcoClock, IcoCoins, IcoCopy, IcoDiscord, IcoShield, IcoSword, IcoTrophy, IcoUsers } from '../components/Icons';
+import PvpBlock from '../components/PvpBlock';
 
 const FORUM_URL = 'https://forum.cyberpw.fun/index.php?threads/high-voltagethunderhigh-voltage.252/';
 const DISCORD_URL = 'https://discord.gg/p8bYdfKBQd';
@@ -57,13 +50,15 @@ const TRAITS = [
   'Турніри, розіграші та конкурси спільноти',
 ];
 
+const FARM_COLS = 'minmax(160px, 1fr) 110px repeat(4, 76px)';
+
 /** Клікабельний нік — копіює в буфер, на 1.2с показує підтвердження. */
 function CopyableNick({ nickname }: { nickname: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
-      className="btn btn-ghost btn-sm"
+      className={'chip' + (copied ? ' is-on' : '')}
       title="Клік — скопіювати нік"
       onClick={() => {
         copyText(nickname);
@@ -71,26 +66,25 @@ function CopyableNick({ nickname }: { nickname: string }) {
         setTimeout(() => setCopied(false), 1200);
       }}
     >
-      {copied ? '✓ Скопійовано' : nickname}
+      {copied ? <><IcoCheck style={{ width: 13, height: 13 }} /> Скопійовано</> : <><IcoCopy style={{ width: 13, height: 13 }} /> {nickname}</>}
     </button>
   );
 }
-
-/** Українська множина для "N перемог" (1 — перемога, 2-4 — перемоги, 5+ — перемог). */
-function pluralWins(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'перемога';
-  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return 'перемоги';
-  return 'перемог';
-}
-
-const hallOfFameMax = Math.max(...HALL_OF_FAME.map((r) => r.wins));
 
 export default function HomePage() {
   const [rows, setRows] = useState<GearFarmRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [ladderTop, setLadderTop] = useState<LadderPreviewEntry[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLadderPreview(5)
+      .then((top) => !cancelled && setLadderTop(top))
+      .catch(() => !cancelled && setLadderTop([]));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,57 +106,143 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchLadderPreview(5)
-      .then((top) => !cancelled && setLadderTop(top))
-      .catch(() => !cancelled && setLadderTop([]));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
-    <div>
+    <div className="page">
       <PageMeta
         title="Thunder — гільдія"
         description="PvPvE • КХ • TW • FUN. Живий Discord, клан-банк на крафт Р8, турніри та конкурси спільноти. Дізнайся, як влаштоване життя гільдії Thunder."
       />
 
-      <div className="hero-banner">
-        <img src={import.meta.env.BASE_URL + 'assets/thunder-hero.gif'} alt="Thunder" />
-        <div>
+      <section className="hero">
+        <img className="hero-crest" src={import.meta.env.BASE_URL + 'assets/thunder-hero.gif'} alt="Thunder" />
+        <div className="hero-text">
           <span className="eyebrow">Гільдія Thunder</span>
-          <h1>PvPvE • КХ • TW • FUN</h1>
+          <h1>
+            PvPvE<span className="sep">•</span>КХ<span className="sep">•</span>TW<span className="sep">•</span>FUN
+          </h1>
           <p>Like Thunder from the sky, sworn to fight and die 💪⚡⚡⚡</p>
-          <a href={DISCORD_URL} target="_blank" rel="noopener" className="btn btn-primary" style={{ marginTop: 14 }}>
-            Приєднатися в Discord
-          </a>
+          <div className="hero-actions">
+            <a href={DISCORD_URL} target="_blank" rel="noopener" className="btn btn-discord">
+              <IcoDiscord /> Приєднатися в Discord
+            </a>
+            <a href={FORUM_URL} target="_blank" rel="noopener" className="btn btn-ghost">
+              Тема на форумі
+            </a>
+          </div>
+        </div>
+        <div className="hero-facts">
+          <div className="tile icon">
+            <span className="tile-i"><IcoDiscord /></span>
+            <span className="tile-l">Головна вимога</span>
+            <span className="tile-v text">Discord на івентах</span>
+            <span className="tile-s">готовність заходити під час івентів</span>
+          </div>
+          <div className="tile icon">
+            <span className="tile-i"><IcoClock /></span>
+            <span className="tile-l">Онлайн</span>
+            <span className="tile-v text">2+ год / день</span>
+            <span className="tile-s">менше — не підходить під наш темп</span>
+          </div>
+          <div className="tile icon">
+            <span className="tile-i"><IcoCoins /></span>
+            <span className="tile-l">Фарм</span>
+            <span className="tile-v text">На клан-банк</span>
+            <span className="tile-s">з нього крафтяться шмотки Р8 по черзі</span>
+          </div>
+        </div>
+      </section>
+
+      <PvpBlock />
+
+      <div className="section-head">
+        <span className="eyebrow">Спільнота сервера</span>
+        <h2>Розіграші та конкурси</h2>
+        <p>
+          Окрім клану, та сама команда веде й сусідні проєкти сервера — турніри, марафон заточки й калькулятори (посилання є
+          і в шапці сайту: «PvP», «Ладдер», «Хелпер»).
+        </p>
+      </div>
+      <div className="feature-grid">
+        <div className="panel feature">
+          <div className="panel-head">
+            <h3><IcoBolt /> Ладдер страждання</h3>
+            <span className="panel-sub">КХ-марафон заточки</span>
+          </div>
+          <div className="panel-body stack sm">
+            <p>
+              Хто підніме шмотку на найвищий рівень і за найменше спроб. Лідери вже далеко попереду, але рахується будь-яка
+              спроба — доєднатися можна в будь-який момент.
+            </p>
+            {ladderTop === null && <p className="loading"><span className="spinner" /> Завантаження…</p>}
+            {ladderTop !== null && ladderTop.length === 0 && <p className="hint">Поки що немає результатів.</p>}
+            {ladderTop !== null && ladderTop.length > 0 && (
+              <div className="stack sm">
+                {ladderTop.map((e, i) => (
+                  <div key={e.nickname} className="row between">
+                    <span className="row" style={{ gap: 8 }}>
+                      <span className={'medal' + (i < 3 ? ` m${i + 1}` : '')} style={{ width: 24, height: 24, fontSize: 11 }}>{i + 1}</span>
+                      <b>{e.nickname}</b>
+                    </span>
+                    <span className="badge mute">+{e.level} · {e.attempts} спроб</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="hint">Минулого розіграшу фонд {LADDER_PRIZE_CHESTS} скринь розподілили між топ-10 місць ладдера.</p>
+          </div>
+          <div className="panel-foot">
+            <a href={LADDER_URL} target="_blank" rel="noopener" className="link">Перейти до ладдера →</a>
+          </div>
+        </div>
+
+        <div className="panel feature">
+          <div className="panel-head">
+            <h3><IcoTrophy /> Турнір на {PAST_TOURNAMENT_600.prizeChests} скринь</h3>
+          </div>
+          <div className="panel-body">
+            Один з минулих турнірів розігрував призовий фонд у {PAST_TOURNAMENT_600.prizeChests} скринь — сітка й фінальні
+            результати за посиланням.
+          </div>
+          <div className="panel-foot">
+            <a href={PAST_TOURNAMENT_600.bracketUrl} target="_blank" rel="noopener" className="link">Сітка турніру →</a>
+          </div>
+        </div>
+
+        <div className="panel feature">
+          <div className="panel-head">
+            <h3><IcoCoins /> Калькулятор заточки</h3>
+            <span className="panel-sub">PW Хелпер</span>
+          </div>
+          <div className="panel-body">
+            Калькулятор на calc.thunderpw.fun/refine рахує найдешевший очікуваний план заточки шмотки з одного рівня до
+            бажаного (камені, шанси, штраф при невдачі) — зроблений спеціально під наш сервер.
+          </div>
+          <div className="panel-foot">
+            <a href={CALC_REFINE_URL} target="_blank" rel="noopener" className="link">Відкрити калькулятор →</a>
+          </div>
         </div>
       </div>
 
-      <div className="section-head" style={{ marginTop: 8 }}>
+      <div className="section-head">
         <span className="eyebrow">Про нас</span>
         <h2>Чому Thunder</h2>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10, marginBottom: 8 }}>
+      <div className="traits">
         {TRAITS.map((t) => (
-          <div key={t} className="card" style={{ padding: '14px 18px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ color: 'var(--good)', fontWeight: 700, flex: '0 0 auto' }}>✔</span>
+          <div key={t} className="trait">
+            <span className="trait-i"><IcoCheck /></span>
             <span>{t}</span>
           </div>
         ))}
       </div>
 
-      <div className="card" style={{ marginTop: 20, textAlign: 'center' }}>
-        <p style={{ fontSize: 17, fontStyle: 'italic', margin: 0, color: 'var(--text-dim)' }}>
-          «Поки інші збирають альянс, щоб задавити нас числом, ми просто виходимо битися.
-          <br />
-          Не обіцяємо легкого життя, але — буде весело)»
-        </p>
-      </div>
+      <blockquote className="quote">
+        Поки інші збирають альянс, щоб задавити нас числом, ми просто виходимо битися.
+        <br />
+        Не обіцяємо легкого життя, але — буде весело)
+      </blockquote>
 
-      <div className="section-head" style={{ marginTop: 32 }}>
+      <div className="section-head">
         <span className="eyebrow">Наживо</span>
         <h2>Чому вигідніше фармити кланом</h2>
         <p>
@@ -171,197 +251,105 @@ export default function HomePage() {
           регулярно й активно скидаєш лут у банк — просто перебувати в клані недостатньо.
         </p>
       </div>
-      {err && <p className="form-err">{err}</p>}
-      {!rows && !err && <p className="hint">Завантаження…</p>}
-      {rows && rows.length === 0 && <p className="hint">Шмоток ще не додано (керування — на сторінці «Р8»).</p>}
-      {rows && rows.length > 0 && (
-        <>
-          <div className="rowlist" style={{ marginBottom: 8 }}>
-            <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(150px, 1fr) 110px 72px 72px 72px 72px' }}>
-              <span>Шмотка</span>
-              <span>Ціна</span>
-              <span>1 перс</span>
-              <span>2 перса</span>
-              <span>3 перса</span>
-              <span>4 перса</span>
-            </div>
-            {rows.map((r, i) => (
-              <div
-                key={r.id}
-                className="rowlist-row"
-                style={{ gridTemplateColumns: 'minmax(150px, 1fr) 110px 72px 72px 72px 72px', fontWeight: i === 0 ? 700 : 400 }}
-              >
-                <span>{r.name}</span>
-                <span title={formatPriceExact(r.price)}>{formatPrice(r.price)}</span>
-                {r.weeksByWindows.map((w, wi) => (
-                  <span key={wi} title={w === null ? 'немає дропу' : `${w} тижн.`}>
-                    {w === null ? '—' : w}
-                  </span>
-                ))}
+      <div className="panel">
+        <div className="panel-head">
+          <h3><IcoCoins /> Тижнів фарму на шмотку</h3>
+          <span className="panel-sub">за кількістю вікон КХ одночасно</span>
+          <div className="panel-actions">
+            <button type="button" className="btn btn-ghost btn-xs" data-goto="farm">Калькулятор →</button>
+          </div>
+        </div>
+        <div className="panel-body flush">
+          {err && <p className="form-err" style={{ padding: 14 }}>{err}</p>}
+          {!rows && !err && <p className="loading" style={{ padding: '10px 14px' }}><span className="spinner" /> Завантаження…</p>}
+          {rows && rows.length === 0 && <p className="rowlist-empty">Шмоток ще не додано (керування — на сторінці «Шмотки Р8»).</p>}
+          {rows && rows.length > 0 && (
+            <div className="rowlist">
+              <div className="rowlist-head" style={{ gridTemplateColumns: FARM_COLS }}>
+                <span>Шмотка</span>
+                <span>Ціна</span>
+                <span>1 перс</span>
+                <span>2 перса</span>
+                <span>3 перса</span>
+                <span>4 перса</span>
               </div>
-            ))}
-          </div>
-          <p className="hint">
-            Значення в колонках «N перс» — тижні соло-фарму цією кількістю персонажів одночасно. Черга крафту й видачі лута з
-            РБ визначається активністю та пріоритетністю класу — хто найбільше долучається, той раніше отримує своє. Власний
-            набір і точний калькулятор — на сторінці «Р8 фарм».
-          </p>
-        </>
-      )}
-
-      <div className="section-head" style={{ marginTop: 32 }}>
-        <span className="eyebrow">Вимоги</span>
-        <h2>Кого ми шукаємо</h2>
-      </div>
-      <div className="card">
-        <p>
-          <strong>⚠️ Головна вимога — готовність заходити в{' '}
-          <a href={DISCORD_URL} target="_blank" rel="noopener" className="link">Discord</a> під час івентів.</strong> Якщо
-          так, з імовірністю ~90% ти нам підходиш — це перше, що уточнюємо на співбесіді.
-        </p>
-        <p style={{ marginBottom: 0 }}>
-          <strong>Онлайн — мінімум 2 години на день у грі.</strong> Менше — на жаль, не підходить під наш темп.
-        </p>
-      </div>
-
-      <div className="section-head" style={{ marginTop: 32 }}>
-        <span className="eyebrow">Механіки клану</span>
-        <h2>Як влаштоване життя гільдії</h2>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>🛡️ Фарм КХ</h3>
-          <p style={{ marginBottom: 0 }}>
-            Фарм КХ у нас відбувається на клан-банк: усе, що падає під час фарму, скидається туди. З цих ресурсів по черзі
-            крафтяться шмотки 8 рангу для членів клану.
-          </p>
-        </div>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>⚔️ Лут з РБ</h3>
-          <p style={{ marginBottom: 0 }}>
-            Лут з рейд-босів видається в порядку черги. Черга залежить від активності в клані, участі у РБ і прокачаності
-            персонажа.
-          </p>
-        </div>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>📚 Банк скілів</h3>
-          <p style={{ marginBottom: 0 }}>
-            Повторювані скіли, які вже є у когось із клану, складаються у спільний банк — звідти можна забрати ті, яких у тебе
-            ще немає.
-          </p>
-        </div>
-      </div>
-
-      <div className="section-head" style={{ marginTop: 32 }}>
-        <span className="eyebrow">Спільнота сервера</span>
-        <h2>Турніри, розіграші та конкурси</h2>
-        <p>
-          Окрім клану, та сама команда веде й сусідні проєкти сервера — турніри, марафон заточки й калькулятори (посилання
-          є і в шапці сайту: «PvP», «Ладдер», «Хелпер»).
-        </p>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-        <div className="card">
-          <p className="hint" style={{ margin: '0 0 2px' }}>Останній турнір</p>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>{LATEST_TOURNAMENT.name}</h3>
-          <p className="hint" style={{ margin: '0 0 10px' }}>{LATEST_TOURNAMENT.dateLabel}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14, alignItems: 'end' }}>
-            {([2, 1, 3] as const).map((place) => {
-              const p = LATEST_TOURNAMENT.podium.find((x) => x.place === place);
-              if (!p) return <div key={place} />;
-              const isChamp = place === 1;
-              return (
-                <div key={place} className={'podium-place' + (isChamp ? ' champion' : '')}>
-                  <div className={'rank-circle' + (isChamp ? ' rank-1' : '')}>{place}</div>
-                  <div className="hint" style={{ margin: '0 0 2px', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
-                    {isChamp ? 'Чемпіон' : `${place} місце`}
-                  </div>
-                  <strong style={{ fontSize: isChamp ? 15 : 13, wordBreak: 'break-word' }}>{p.nickname}</strong>
-                </div>
-              );
-            })}
-          </div>
-          <a href={LATEST_TOURNAMENT.bracketUrl} target="_blank" rel="noopener" className="link">
-            Сітка й результати →
-          </a>
-        </div>
-
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>🎖️ Зал слави</h3>
-          <p className="hint" style={{ margin: '0 0 10px' }}>Перемоги за всі турніри сервера</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
-            {HALL_OF_FAME.map((r) => (
-              <div key={r.nickname} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className={'rank-circle' + (r.rank === 1 ? ' rank-1' : '')}>{r.rank}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                    <span>{r.nickname}</span>
-                    <span className="hint" style={{ flex: '0 0 auto' }}>
-                      {r.wins} {pluralWins(r.wins)}
+              {rows.map((r, i) => (
+                <div key={r.id} className={'rowlist-row' + (i === 0 ? ' highlight strong' : '')} style={{ gridTemplateColumns: FARM_COLS }}>
+                  <span className="cell-ellipsis">{r.name}</span>
+                  <span className="cell-price" title={formatPriceExact(r.price)}>{formatPrice(r.price)}</span>
+                  {r.weeksByWindows.map((w, wi) => (
+                    <span key={wi} className="num" title={w === null ? 'немає дропу' : `${w} тижн.`}>
+                      {w === null ? '—' : <>{w}<span className="hint"> тижн.</span></>}
                     </span>
-                  </div>
-                  <div className="rank-bar-track">
-                    <div className="rank-bar-fill" style={{ width: `${(r.wins / hallOfFameMax) * 100}%` }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <a href={PVP_URL} target="_blank" rel="noopener" className="link">
-            Усі турніри →
-          </a>
-        </div>
-
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>⚡ Ладдер страждання (КХ-марафон)</h3>
-          <p style={{ marginBottom: 10 }}>
-            Марафон заточки каменями: хто підніме шмотку на найвищий рівень і за найменше спроб. Лідери вже далеко
-            попереду, але рахується будь-яка спроба — доєднатися можна в будь-який момент.
-          </p>
-          {ladderTop === null && <p className="hint">Завантаження…</p>}
-          {ladderTop !== null && ladderTop.length === 0 && <p className="hint">Поки що немає результатів.</p>}
-          {ladderTop !== null && ladderTop.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-              {ladderTop.map((e, i) => (
-                <div key={e.nickname} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span>{i + 1}. {e.nickname}</span>
-                  <span className="badge mute">+{e.level} · {e.attempts} спроб</span>
+                  ))}
                 </div>
               ))}
             </div>
           )}
-          <p className="hint" style={{ margin: '0 0 10px' }}>
-            Минулого розіграшу фонд {LADDER_PRIZE_CHESTS} скринь розподілили між топ-10 місць ладдера.
-          </p>
-          <a href={LADDER_URL} target="_blank" rel="noopener" className="link">
-            Перейти до ладдера →
-          </a>
         </div>
+        {rows && rows.length > 0 && (
+          <div className="panel-foot">
+            Значення в колонках «N перс» — тижні соло-фарму цією кількістю персонажів одночасно. Черга крафту й видачі лута з
+            РБ визначається активністю та пріоритетністю класу — хто найбільше долучається, той раніше отримує своє. Власний
+            набір і точний калькулятор — на сторінці «Р8 фарм».
+          </div>
+        )}
+      </div>
 
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>🎁 Минулий турнір · {PAST_TOURNAMENT_600.prizeChests} скринь</h3>
-          <p style={{ marginBottom: 10 }}>
-            Один з минулих турнірів розігрував призовий фонд у {PAST_TOURNAMENT_600.prizeChests} скринь — сітка й фінальні
-            результати за посиланням.
-          </p>
-          <a href={PAST_TOURNAMENT_600.bracketUrl} target="_blank" rel="noopener" className="link">
-            Сітка турніру →
-          </a>
+      <div className="section-head">
+        <span className="eyebrow">Вимоги</span>
+        <h2>Кого ми шукаємо</h2>
+      </div>
+      <div className="req">
+        <div className="req-item">
+          <span className="req-ico"><IcoDiscord /></span>
+          <div>
+            <b>Discord під час івентів</b>
+            <p>
+              Головна вимога — готовність заходити в{' '}
+              <a href={DISCORD_URL} target="_blank" rel="noopener" className="link">Discord</a> під час івентів. Якщо так, з
+              імовірністю ~90% ти нам підходиш — це перше, що уточнюємо на співбесіді.
+            </p>
+          </div>
         </div>
-
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>🧮 PW Хелпер — калькулятор заточки</h3>
-          <p style={{ marginBottom: 10 }}>
-            Калькулятор на calc.thunderpw.fun/refine рахує найдешевший очікуваний план заточки шмотки з одного рівня до
-            бажаного (камені, шанси, штраф при невдачі) — зроблений спеціально під наш сервер.
-          </p>
-          <a href={CALC_REFINE_URL} target="_blank" rel="noopener" className="link">
-            Відкрити калькулятор →
-          </a>
+        <div className="req-item">
+          <span className="req-ico"><IcoClock /></span>
+          <div>
+            <b>Онлайн — мінімум 2 години на день</b>
+            <p>Менше — на жаль, не підходить під наш темп.</p>
+          </div>
         </div>
       </div>
 
-      <div className="section-head" style={{ marginTop: 32 }}>
+      <div className="section-head">
+        <span className="eyebrow">Механіки клану</span>
+        <h2>Як влаштоване життя гільдії</h2>
+      </div>
+      <div className="feature-grid">
+        <div className="panel feature">
+          <div className="panel-head"><h3><IcoShield /> Фарм КХ</h3></div>
+          <div className="panel-body">
+            Фарм КХ у нас відбувається на клан-банк: усе, що падає під час фарму, скидається туди. З цих ресурсів по черзі
+            крафтяться шмотки 8 рангу для членів клану.
+          </div>
+        </div>
+        <div className="panel feature">
+          <div className="panel-head"><h3><IcoSword /> Лут з РБ</h3></div>
+          <div className="panel-body">
+            Лут з рейд-босів видається в порядку черги. Черга залежить від активності в клані, участі у РБ і прокачаності
+            персонажа.
+          </div>
+        </div>
+        <div className="panel feature">
+          <div className="panel-head"><h3><IcoBook /> Банк скілів</h3></div>
+          <div className="panel-body">
+            Повторювані скіли, які вже є у когось із клану, складаються у спільний банк — звідти можна забрати ті, яких у тебе
+            ще немає.
+          </div>
+        </div>
+      </div>
+
+      <div className="section-head">
         <span className="eyebrow">Співбесіда</span>
         <h2>Що запитаємо при вступі</h2>
         <p>
@@ -369,38 +357,46 @@ export default function HomePage() {
           активностей. Нічого страшного: якщо ти новачок, тут же підкажемо з фармом і розвитком персонажа.
         </p>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>1️⃣ Попередня гільдія</h3>
-          <p style={{ marginBottom: 0 }}>
+      <div className="feature-grid">
+        <div className="panel feature">
+          <div className="panel-head"><span className="feature-n">1</span><h3>Попередня гільдія</h3></div>
+          <div className="panel-body">
             З якої гільдії перейшов (якщо була)? Чи були конфлікти — і з якого приводу? Якщо був свідком конфлікту — на чиєму
             боці був?
-          </p>
+          </div>
         </div>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>2️⃣ Онлайн</h3>
-          <p style={{ marginBottom: 0 }}>
-            Скільки часу проводиш у грі? <span className="badge bad">Менше 2 год/день — не підходить.</span>
-          </p>
+        <div className="panel feature">
+          <div className="panel-head"><span className="feature-n">2</span><h3>Онлайн</h3></div>
+          <div className="panel-body">
+            Скільки часу проводиш у грі? <span className="badge bad wrap">менше 2 год/день — не підходить</span>
+          </div>
         </div>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>3️⃣ Спосіб фарму</h3>
-          <p style={{ marginBottom: 0 }}>Як плануєш фармити — донат, конста чи твіни? Так ми зрозуміємо твій план розвитку персонажа.</p>
+        <div className="panel feature">
+          <div className="panel-head"><span className="feature-n">3</span><h3>Спосіб фарму</h3></div>
+          <div className="panel-body">Як плануєш фармити — донат, конста чи твіни? Так ми зрозуміємо твій план розвитку персонажа.</div>
         </div>
       </div>
 
-      <div className="section-head" style={{ marginTop: 32 }}>
+      <div className="section-head">
         <span className="eyebrow">Набір</span>
         <h2>Хто відповідає за набір</h2>
         <p>Є питання про вступ — пиши будь-кому з офіцерів нижче (клік по ніку — скопіювати).</p>
       </div>
-      <div className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {RECRUITMENT_OFFICERS.map((o) => (
-          <CopyableNick key={o.nickname} nickname={o.nickname} />
-        ))}
+      <div className="panel">
+        <div className="panel-head">
+          <h3><IcoUsers /> Офіцери набору</h3>
+          <span className="panel-sub">у грі або в Discord</span>
+        </div>
+        <div className="panel-body">
+          <div className="chips">
+            {RECRUITMENT_OFFICERS.map((o) => (
+              <CopyableNick key={o.nickname} nickname={o.nickname} />
+            ))}
+          </div>
+        </div>
       </div>
 
-      <p className="hint" style={{ marginTop: 32 }}>
+      <p className="hint">
         Більше про нас — на{' '}
         <a href={FORUM_URL} target="_blank" rel="noopener" className="link">
           офіційній темі гільдії на форумі сервера

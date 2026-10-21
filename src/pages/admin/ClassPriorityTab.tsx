@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
+import { IcoPlus, IcoTrash } from '../../components/Icons';
 import { createClass, deleteClass, fetchClasses, updateClass } from '../../data/classes';
 import type { ClassRow } from '../../data/types';
 import { classBadgeVariant } from '../../data/types';
 
-const COLUMNS = '1fr 130px 150px 210px 90px';
+const COLUMNS = 'minmax(160px, 1fr) 110px 150px minmax(180px, 220px) 60px';
 
 function TextInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
@@ -38,6 +39,8 @@ function CoefInput({ initial, onSave }: { initial: number; onSave: (v: number) =
       min={0}
       step={0.1}
       value={value}
+      className="num"
+      style={{ textAlign: 'center' }}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => {
         const n = Number(value);
@@ -49,7 +52,7 @@ function CoefInput({ initial, onSave }: { initial: number; onSave: (v: number) =
 
 function VariantBadge({ coef }: { coef: number }) {
   const variant = classBadgeVariant(coef);
-  const label = variant === 'priority' ? 'пріоритетний ⚡' : variant === 'mute' ? 'знижений' : 'звичайний';
+  const label = variant === 'priority' ? '⚡ пріоритетний' : variant === 'mute' ? 'знижений' : 'звичайний';
   return <span className={variant === 'neutral' ? 'badge' : `badge ${variant}`}>{label}</span>;
 }
 
@@ -83,14 +86,12 @@ export default function ClassPriorityTab() {
   };
 
   return (
-    <div>
-      <h3>Приоритетність класів</h3>
-      <p className="hint" style={{ marginBottom: 12 }}>
-        Коефіцієнт множиться на бали активності при щоденному нарахуванні. За замовчуванням — 1 (звичайний пріоритет).
-        «Емодзі РБ» — реакція під постом збору на РБ (сторінка «РБ»): класи без емодзі в зборі не беруть участі.
-      </p>
+    <div className="stack">
       <AdminTable
+        title="Приоритетність класів"
+        hint="коефіцієнт множиться на бали активності при нарахуванні (1 — звичайний, >1.2 — пріоритетний, <0.8 — знижений); «Емодзі РБ» — реакція під постом збору на РБ, класи без емодзі в зборі не беруть участі"
         columns={COLUMNS}
+        minWidth={760}
         header={['Клас', 'Коефіцієнт', 'Підсвітка', 'Емодзі РБ', '']}
         rows={classes}
         keyFn={(c) => c.id}
@@ -100,26 +101,28 @@ export default function ClassPriorityTab() {
           <CoefInput key="coef" initial={c.coef} onSave={(v) => updateClass(c.id, { coef: v }).then(reload).catch(reportError)} />,
           <VariantBadge key="badge" coef={c.coef} />,
           <EmojiInput key="emoji" initial={c.rbEmoji} onSave={(v) => updateClass(c.id, { rbEmoji: v }).then(reload).catch(reportError)} />,
-          <button
-            key="del"
-            type="button"
-            className="btn btn-bad btn-sm"
-            onClick={() => confirm(`Видалити клас «${c.name}»?`) && deleteClass(c.id).then(reload).catch(reportError)}
-          >
-            Видалити
-          </button>,
+          <span key="del" className="cell-actions">
+            <button
+              type="button"
+              className="btn btn-bad btn-xs"
+              title="Видалити"
+              onClick={() => confirm(`Видалити клас «${c.name}»?`) && deleteClass(c.id).then(reload).catch(reportError)}
+            >
+              <IcoTrash />
+            </button>
+          </span>,
         ]}
         addRow={
           <>
-            <label className="field" style={{ flex: '1 1 220px' }}>
+            <label className="field">
               <span>Назва класу</span>
               <input type="text" value={newName} placeholder="Назва класу" onChange={(e) => setNewName(e.target.value)} />
             </label>
-            <label className="field" style={{ flex: '0 0 140px' }}>
+            <label className="field narrow">
               <span>Коефіцієнт</span>
               <input type="number" min={0} step={0.1} value={newCoef} onChange={(e) => setNewCoef(e.target.value)} />
             </label>
-            <button type="button" className="btn btn-primary" disabled={busy || !newName.trim()} onClick={add}>+ Додати</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !newName.trim()} onClick={add}><IcoPlus /> Додати</button>
           </>
         }
       />

@@ -62,21 +62,12 @@ export function useClassFilter(people: HasClass[], classById: Map<string, ClassR
 export function ClassFilterChips({ filter }: { filter: ClassFilterState }) {
   if (filter.chips.length <= 1) return null;
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }} role="group" aria-label="Фільтр по класах">
-      <button
-        type="button"
-        className={'btn btn-sm ' + (filter.selected.size === 0 ? 'btn-primary' : 'btn-ghost')}
-        onClick={filter.clear}
-      >
+    <div className="chips" role="group" aria-label="Фільтр по класах">
+      <button type="button" className={'chip' + (filter.selected.size === 0 ? ' is-on' : '')} onClick={filter.clear}>
         Всі
       </button>
       {filter.chips.map((c) => (
-        <button
-          key={c.key}
-          type="button"
-          className={'btn btn-sm ' + (filter.selected.has(c.key) ? 'btn-primary' : 'btn-ghost')}
-          onClick={() => filter.toggle(c.key)}
-        >
+        <button key={c.key} type="button" className={'chip' + (filter.selected.has(c.key) ? ' is-on' : '')} aria-pressed={filter.selected.has(c.key)} onClick={() => filter.toggle(c.key)}>
           {c.label}
         </button>
       ))}

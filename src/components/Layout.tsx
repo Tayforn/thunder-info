@@ -93,7 +93,7 @@ export default function Layout() {
   // входу, тож їх не перехоплюємо.
   if (ROUTE_ACCESS[route.name] === 'member' && !viewer.member && !viewer.admin) {
     page = adminLoading || meLoading
-      ? <p className="hint" style={{ padding: 24 }}>Перевірка доступу…</p>
+      ? <p className="loading"><span className="spinner" /> Перевірка доступу…</p>
       : <MemberNotice onLogin={login} />;
   }
 

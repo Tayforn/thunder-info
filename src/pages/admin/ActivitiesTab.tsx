@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { errorMessage, reportError } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
+import { IcoPlus, IcoTrash } from '../../components/Icons';
 import WeekdayPicker from '../../components/WeekdayPicker';
 import { createActivity, deleteActivity, fetchActivities, updateActivity } from '../../data/activities';
 import type { Activity } from '../../data/types';
 
-const COLUMNS = '1fr 100px 1fr 90px';
+const COLUMNS = 'minmax(160px, 1fr) 90px 300px 60px';
 
 function TextInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
@@ -21,6 +22,8 @@ function PointsInput({ initial, onSave }: { initial: number; onSave: (v: number)
       type="number"
       min={0}
       value={value}
+      className="num"
+      style={{ textAlign: 'center' }}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => {
         const n = Number(value);
@@ -62,10 +65,12 @@ export default function ActivitiesTab() {
   };
 
   return (
-    <div>
-      <h3>Активності</h3>
+    <div className="stack">
       <AdminTable
+        title="Активності"
+        hint="дні тижня визначають, у які дні активність зʼявляється на сторінці «Активність»"
         columns={COLUMNS}
+        minWidth={660}
         header={['Назва', 'Бали', 'Дні тижня', '']}
         rows={activities}
         keyFn={(a) => a.id}
@@ -74,30 +79,32 @@ export default function ActivitiesTab() {
           <TextInput key="name" initial={a.name} onSave={(v) => updateActivity(a.id, { name: v }).then(reload).catch(reportError)} />,
           <PointsInput key="pts" initial={a.points} onSave={(v) => updateActivity(a.id, { points: v }).then(reload).catch(reportError)} />,
           <WeekdayPicker key="days" value={a.weekdays} onChange={(v) => updateActivity(a.id, { weekdays: v }).then(reload).catch(reportError)} />,
-          <button
-            key="del"
-            type="button"
-            className="btn btn-bad btn-sm"
-            onClick={() => confirm(`Видалити активність «${a.name}»?`) && deleteActivity(a.id).then(reload).catch(reportError)}
-          >
-            Видалити
-          </button>,
+          <span key="del" className="cell-actions">
+            <button
+              type="button"
+              className="btn btn-bad btn-xs"
+              title="Видалити"
+              onClick={() => confirm(`Видалити активність «${a.name}»?`) && deleteActivity(a.id).then(reload).catch(reportError)}
+            >
+              <IcoTrash />
+            </button>
+          </span>,
         ]}
         addRow={
           <>
-            <label className="field" style={{ flex: '1 1 200px' }}>
+            <label className="field">
               <span>Назва</span>
               <input type="text" value={newName} placeholder="Назва активності" onChange={(e) => setNewName(e.target.value)} />
             </label>
-            <label className="field" style={{ flex: '0 0 100px' }}>
+            <label className="field narrow" style={{ flexBasis: 90 }}>
               <span>Бали</span>
               <input type="number" min={0} value={newPoints} onChange={(e) => setNewPoints(e.target.value)} />
             </label>
-            <div className="field" style={{ flex: '1 1 260px' }}>
+            <div className="field" style={{ flex: '0 0 auto' }}>
               <span>Дні тижня</span>
               <WeekdayPicker value={newWeekdays} onChange={setNewWeekdays} />
             </div>
-            <button type="button" className="btn btn-primary" disabled={busy || !newName.trim()} onClick={add}>+ Додати</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !newName.trim()} onClick={add}><IcoPlus /> Додати</button>
           </>
         }
       />

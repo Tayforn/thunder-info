@@ -1,5 +1,5 @@
 // =========================================================
-// Публічна сторінка "Новачки" — ростер гільдії: клас (з підсвіткою
+// Сторінка "Новачки" — ростер гільдії: клас (з підсвіткою
 // пріоритетності) + сума балів активності, сортування за спаданням балів.
 // Клік на новачка відкриває read-only календар відвідуваності (без
 // премій і ретро-редагування — бали новачків фіналізує крон
@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageMeta from '../app/PageMeta';
 import ClassBadge from '../components/ClassBadge';
 import AttendanceCalendar, { MONTH_NOM, dateKey } from '../components/AttendanceCalendar';
+import { IcoCal, IcoChevL, IcoChevR, IcoList } from '../components/Icons';
 import { useAuth } from '../app/useAuth';
 import { fetchActivities } from '../data/activities';
 import { fetchNewbieChecksRange } from '../data/activityChecks';
@@ -28,7 +29,7 @@ export default function NewbiesPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const columns = isAdmin ? 'minmax(150px, 1fr) 160px 120px' : 'minmax(150px, 1fr) 160px';
+  const columns = isAdmin ? '44px minmax(150px, 1fr) 150px 90px' : '44px minmax(150px, 1fr) 150px';
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState(() => {
@@ -78,59 +79,86 @@ export default function NewbiesPage() {
       return { y: d.getFullYear(), m: d.getMonth() };
     });
 
+  const calendar = selected && (
+    <div className="panel sticky">
+      <div className="panel-head">
+        <h3><IcoCal /> Відвідуваність</h3>
+        <span className="panel-sub" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>{selected.nickname}</span>
+        <div className="panel-actions">
+          <div className="cal-nav">
+            <button type="button" className="btn btn-ghost btn-xs btn-ico" aria-label="Попередній місяць" onClick={() => stepMonth(-1)}><IcoChevL /></button>
+            <b>{MONTH_NOM[anchor.m]} {anchor.y}</b>
+            <button type="button" className="btn btn-ghost btn-xs btn-ico" aria-label="Наступний місяць" onClick={() => stepMonth(1)}><IcoChevR /></button>
+          </div>
+          <button type="button" className="btn btn-quiet btn-xs" title="Закрити" onClick={() => setSelectedId(null)}>✕</button>
+        </div>
+      </div>
+      <div className="panel-body">
+        {!checksByDate ? (
+          <p className="loading"><span className="spinner" /> Завантаження…</p>
+        ) : (
+          <AttendanceCalendar year={anchor.y} month={anchor.m} activities={activities} checksByDate={checksByDate} showPoints={false} />
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div>
+    <div className="page">
       <PageMeta title="Новачки — Thunder" description="Ростер новачків гільдії Thunder: клас і активність." />
-      <div className="section-head">
-        <span className="eyebrow">Гільдія</span>
-        <h2>Новачки</h2>
-        <p>Клас підсвічено за пріоритетністю (⚡ — пріоритетний клас), сортування — за сумою балів активності. Клікни на новачка, щоб побачити календар відвідуваності.</p>
+      <div className="page-head">
+        <div className="page-head-text">
+          <span className="eyebrow">Гільдія</span>
+          <h1>Новачки</h1>
+          <p>
+            Клас підсвічено за пріоритетністю (⚡ — пріоритетний клас), сортування — за сумою балів активності. Клікни на
+            новачка, щоб побачити календар відвідуваності.
+          </p>
+        </div>
       </div>
 
       {err && <p className="form-err">{err}</p>}
-      {!rows && !err && <p className="hint">Завантаження…</p>}
+      {!rows && !err && <p className="loading"><span className="spinner" /> Завантаження…</p>}
 
       {rows && (
-        <div className="rowlist">
-          <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
-            <span>Нікнейм</span>
-            <span>Клас</span>
-            {isAdmin && <span>Бали</span>}
-          </div>
-          {rows.length === 0 ? (
-            <p className="rowlist-empty hint">Новачків ще немає.</p>
-          ) : (
-            rows.map((r) => (
-              <div
-                key={r.id}
-                className={'rowlist-row rowlist-row-click' + (r.id === selectedId ? ' selected' : '')}
-                style={{ gridTemplateColumns: columns, cursor: 'pointer' }}
-                onClick={() => setSelectedId((cur) => (cur === r.id ? null : r.id))}
-              >
-                <span>{r.nickname}</span>
-                <span><ClassBadge cls={r.cls} /></span>
-                {isAdmin && <span style={{ fontWeight: 700 }}>{r.totalPoints}</span>}
+        <div className={'split' + (selected ? ' main-side' : '')}>
+          <div className="panel">
+            <div className="panel-head">
+              <h3><IcoList /> Ростер новачків</h3>
+              <span className="badge mute">{rows.length}</span>
+            </div>
+            <div className="panel-body flush">
+              <div className="rowlist">
+                <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
+                  <span>#</span>
+                  <span>Нікнейм</span>
+                  <span>Клас</span>
+                  {isAdmin && <span className="cell-right">Бали</span>}
+                </div>
+                {rows.length === 0 ? (
+                  <p className="rowlist-empty">Новачків ще немає.</p>
+                ) : (
+                  rows.map((r, i) => (
+                    <div
+                      key={r.id}
+                      className={'rowlist-row row-click' + (r.id === selectedId ? ' selected' : '')}
+                      style={{ gridTemplateColumns: columns }}
+                      onClick={() => setSelectedId((cur) => (cur === r.id ? null : r.id))}
+                    >
+                      <span className="cell-rank"><span className={'medal' + (isAdmin && r.totalPoints > 0 && i < 3 ? ` m${i + 1}` : '')}>{i + 1}</span></span>
+                      <span className="cell-nick">
+                        <b>{r.nickname}</b>
+                        {r.note && <small className="hint">{r.note}</small>}
+                      </span>
+                      <span><ClassBadge cls={r.cls} /></span>
+                      {isAdmin && <span className="cell-pts cell-right">{r.totalPoints}</span>}
+                    </div>
+                  ))
+                )}
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {selected && (
-        <div className="card" style={{ padding: 16, marginTop: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0 }}>Відвідуваність: {selected.nickname}</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => stepMonth(-1)}>←</button>
-              <b style={{ minWidth: 130, textAlign: 'center' }}>{MONTH_NOM[anchor.m]} {anchor.y}</b>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => stepMonth(1)}>→</button>
             </div>
           </div>
-          {!checksByDate ? (
-            <p className="hint">Завантаження…</p>
-          ) : (
-            <AttendanceCalendar year={anchor.y} month={anchor.m} activities={activities} checksByDate={checksByDate} showPoints={false} />
-          )}
+          {calendar}
         </div>
       )}
     </div>

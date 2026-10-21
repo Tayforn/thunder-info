@@ -53,17 +53,10 @@ function AdminTabs() {
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 24 }} role="tablist" aria-label="Адмін-таби">
+    <div className="stack">
+      <div className="seg seg-scroll admin-tabs" role="tablist" aria-label="Адмін-таби">
         {TABS.map((t) => (
-          <button
-            key={t.name}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.name}
-            className={'btn btn-sm ' + (tab === t.name ? 'btn-primary' : 'btn-ghost')}
-            onClick={() => selectTab(t.name)}
-          >
+          <button key={t.name} type="button" role="tab" aria-selected={tab === t.name} className={tab === t.name ? 'is-on' : ''} onClick={() => selectTab(t.name)}>
             {t.label}
           </button>
         ))}
@@ -81,14 +74,20 @@ function AdminTabs() {
 export default function AdminPage() {
   const { session } = useAuth();
   return (
-    <div>
+    <div className="page">
       <PageMeta title="Адмінка — Thunder" />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="section-head">
-        <div>
+      <div className="page-head">
+        <div className="page-head-text">
           <span className="eyebrow">Адмінка</span>
-          <h2>Керування гільдією</h2>
+          <h1>Керування гільдією</h1>
+          <p>Зміни в комірках зберігаються одразу, щойно поле втрачає фокус.</p>
         </div>
-        {session && <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>}
+        {session && (
+          <div className="page-head-actions">
+            <span className="hint">{session.user.email}</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>Вийти</button>
+          </div>
+        )}
       </div>
       <AdminGate>{() => <AdminTabs />}</AdminGate>
     </div>

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { errorMessage } from '../../app/errorMessage';
 import AdminTable from '../../components/AdminTable';
+import { IcoSearch } from '../../components/Icons';
 import { fetchDiscordPlayers, setPlayerBanned, type DiscordPlayer } from '../../data/discordPlayers';
 
 function when(iso: string | null): string {
@@ -59,40 +60,53 @@ export default function AccessTab() {
   const bannedCount = players.filter((p) => p.banned).length;
 
   return (
-    <div>
-      <p className="hint" style={{ marginTop: 0 }}>
-        Усі, хто входив через Discord ({players.length}
-        {bannedCount > 0 ? `, з них забанено ${bannedCount}` : ''}). Бан діє миттєво, без перезаходу:
-        людина лишається зі своєю сесією, але нічого закритого нею не відкриє. Головна та «Р8 фарм» доступні всім і без входу.
-      </p>
-
-      <label className="field" style={{ maxWidth: 280, marginBottom: 14 }}>
-        <span>Пошук за ніком</span>
-        <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Почни вводити нік" />
-      </label>
+    <div className="stack">
+      <div className="tiles" style={{ maxWidth: 480 }}>
+        <div className="tile">
+          <span className="tile-l">Входили через Discord</span>
+          <span className="tile-v">{players.length}</span>
+          <span className="tile-s">Головна та «Р8 фарм» відкриті всім</span>
+        </div>
+        <div className={'tile' + (bannedCount > 0 ? ' bad' : '')}>
+          <span className="tile-l">Забанено</span>
+          <span className="tile-v">{bannedCount}</span>
+          <span className="tile-s">бан діє миттєво, без перезаходу</span>
+        </div>
+      </div>
 
       {err && <p className="form-err">{err}</p>}
       {loading ? (
-        <p className="hint">Завантаження…</p>
+        <p className="loading"><span className="spinner" /> Завантаження…</p>
       ) : (
         <AdminTable
-          columns="2fr 1.4fr 1fr 120px"
-          header={['Нік', 'Останній вхід', 'Статус', 'Дія']}
+          title="Доступ"
+          hint="людина лишається зі своєю сесією, але нічого закритого нею не відкриє"
+          actions={
+            <label className="row" style={{ gap: 6 }}>
+              <IcoSearch style={{ width: 14, height: 14, color: 'var(--text-mute)' }} />
+              <input type="text" className="input input-sm" style={{ width: 180 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Пошук за ніком" />
+            </label>
+          }
+          columns="minmax(160px, 2fr) minmax(140px, 1.4fr) 120px 120px"
+          minWidth={560}
+          header={['Нік', 'Останній вхід', 'Статус', '']}
           rows={shown}
           keyFn={(p) => p.id}
           emptyLabel={players.length === 0 ? 'Ще ніхто не входив через Discord.' : 'Нікого не знайдено.'}
           renderRow={(p) => [
-            <b>{p.nickname}</b>,
-            when(p.lastLoginAt),
-            p.banned ? <span className="badge bad">Забанений</span> : <span className="badge good">Доступ є</span>,
-            <button
-              type="button"
-              className={'btn btn-sm ' + (p.banned ? 'btn-ghost' : 'btn-bad')}
-              disabled={busyId === p.id}
-              onClick={() => toggle(p)}
-            >
-              {busyId === p.id ? '…' : p.banned ? 'Розбанити' : 'Забанити'}
-            </button>,
+            <b key="n">{p.nickname}</b>,
+            <span key="w" className="hint">{when(p.lastLoginAt)}</span>,
+            p.banned ? <span key="s" className="badge bad">Забанений</span> : <span key="s" className="badge good">Доступ є</span>,
+            <span key="a" className="cell-actions">
+              <button
+                type="button"
+                className={'btn btn-xs ' + (p.banned ? 'btn-ghost' : 'btn-bad')}
+                disabled={busyId === p.id}
+                onClick={() => toggle(p)}
+              >
+                {busyId === p.id ? '…' : p.banned ? 'Розбанити' : 'Забанити'}
+              </button>
+            </span>,
           ]}
         />
       )}

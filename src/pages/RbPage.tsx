@@ -27,6 +27,7 @@ import { errorMessage } from '../app/errorMessage';
 import AdminGate from '../components/AdminGate';
 import ClassBadge from '../components/ClassBadge';
 import { sortByClass } from '../components/ClassFilter';
+import { IcoCheck, IcoCopy, IcoDiscord, IcoDownload, IcoImage, IcoMegaphone, IcoRefresh, IcoSettings, IcoShuffle, IcoTarget, IcoTrash, IcoUsers } from '../components/Icons';
 import { fetchClasses } from '../data/classes';
 import { DISCORD_FN_VERSION } from '../data/events';
 import { fetchPlayers } from '../data/players';
@@ -91,21 +92,20 @@ function AddPersonInput({ onAdd }: { onAdd: (nick: string) => void }) {
     setValue('');
   };
   return (
-    <label className="field rb-add">
-      <input
-        type="text"
-        value={value}
-        placeholder="+ дописати нік"
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            commit();
-          }
-        }}
-      />
-    </label>
+    <input
+      type="text"
+      className="input input-sm rb-add"
+      value={value}
+      placeholder="+ дописати нік"
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+        }
+      }}
+    />
   );
 }
 
@@ -148,17 +148,17 @@ function PostSettings({ initial, onSaved }: { initial: RbSettings; onSaved: (s: 
   };
 
   return (
-    <div style={{ borderTop: '1px solid var(--line)', marginTop: 14, paddingTop: 14 }}>
-      <div className="field-row">
+    <div className="stack sm" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+      <div className="field-row" style={{ alignItems: 'flex-start' }}>
         <label className="field" style={{ flex: '2 1 320px' }}>
           <span>Текст поста збору</span>
           <textarea rows={4} value={text} placeholder={RB_DEFAULT_TEXT} onChange={(e) => setText(e.target.value)} />
-          <span className="hint">
+          <small className="hint">
             Порожньо — стандартний текст. <code>{'{date}'}</code> — день тижня й дата, <code>{'{classes}'}</code> — емодзі класів (без нього легенда
             додається в кінець). Працює markdown Discord.
-          </span>
+          </small>
         </label>
-        <label className="field" style={{ flex: '1 1 200px' }}>
+        <div className="field" style={{ flex: '1 1 200px' }}>
           <span>Пінг</span>
           <select value={mode} onChange={(e) => setMode(e.target.value as PingMode)}>
             <option value="default">Роль за замовчуванням</option>
@@ -167,11 +167,11 @@ function PostSettings({ initial, onSaved }: { initial: RbSettings; onSaved: (s: 
             <option value="role">Інша роль (ID)</option>
             <option value="none">Без пінгу</option>
           </select>
-          {mode === 'role' && <input type="text" value={roleId} placeholder="ID ролі" onChange={(e) => setRoleId(e.target.value)} />}
-        </label>
+          {mode === 'role' && <input type="text" className="input-mono" value={roleId} placeholder="ID ролі" onChange={(e) => setRoleId(e.target.value)} />}
+        </div>
       </div>
-      {err && <p className="form-err" style={{ marginTop: 8 }}>{err}</p>}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+      {err && <p className="form-err">{err}</p>}
+      <div className="row">
         <button type="button" className="btn btn-primary btn-sm" disabled={busy || !dirty || (mode === 'role' && !/^\d{5,25}$/.test(roleId.trim()))} onClick={save}>
           {busy ? 'Збереження…' : saved ? 'Збережено ✓' : 'Зберегти'}
         </button>
@@ -193,21 +193,26 @@ function OnlineColumns({ groups, isOn, onToggle, onAdd }: {
         <div key={g.key} className="rb-online-group">
           <div className="rb-online-head">
             {g.title}
-            <span className="hint">{g.people.filter(isOn).length} / {g.people.length}</span>
+            <span className="badge mute">{g.people.filter(isOn).length} / {g.people.length}</span>
           </div>
           {g.people.length === 0 && <p className="hint" style={{ margin: '4px 0' }}>Нікого.</p>}
-          {g.people.map((p) => (
-            <label key={p.id} className={'checkbox-row rb-online-item' + (isOn(p) ? ' on' : '')}>
-              <input type="checkbox" checked={isOn(p)} onChange={() => onToggle(p)} />
-              <span>{p.nickname}</span>
-            </label>
-          ))}
+          {g.people.map((p) => {
+            const on = isOn(p);
+            return (
+              <button key={p.id} type="button" className={'cal-act' + (on ? ' on' : '')} role="checkbox" aria-checked={on} onClick={() => onToggle(p)}>
+                <span className={'check' + (on ? ' is-on' : '')} aria-hidden="true"><IcoCheck /></span>
+                <span>{p.nickname}</span>
+              </button>
+            );
+          })}
           {onAdd && <AddPersonInput onAdd={(n) => onAdd(g.key, n)} />}
         </div>
       ))}
     </div>
   );
 }
+
+const SLOT_COLS = 'minmax(110px, 1fr) minmax(150px, 1fr) minmax(150px, 1fr) 100px';
 
 function RbManager() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
@@ -438,82 +443,92 @@ function RbManager() {
     }
   };
 
-  if (loading) return <p className="hint">Завантаження…</p>;
+  if (loading) return <p className="loading"><span className="spinner" /> Завантаження…</p>;
   if (loadErr) return <p className="form-err">{loadErr}</p>;
 
   const poll = reactions?.poll ?? null;
+  const filled = selectedBosses.filter((b) => slots[b.id]?.sinId || slots[b.id]?.guardId).length;
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }} role="group" aria-label="Джерело людей">
-        <span className="hint" style={{ marginRight: 4 }}>Хто онлайн:</span>
-        <button type="button" className={'btn btn-sm ' + (source === 'discord' ? 'btn-primary' : 'btn-ghost')} onClick={() => setSource('discord')}>
-          З Діскорду (реакції)
-        </button>
-        <button type="button" className={'btn btn-sm ' + (source === 'roster' ? 'btn-primary' : 'btn-ghost')} onClick={() => setSource('roster')}>
-          З ростера (вручну)
-        </button>
+    <div className="stack">
+      <div className="toolbar" role="group" aria-label="Джерело людей">
+        <span className="toolbar-label">Хто онлайн:</span>
+        <div className="seg">
+          <button type="button" className={source === 'discord' ? 'is-on' : ''} onClick={() => setSource('discord')}>З Діскорду (реакції)</button>
+          <button type="button" className={source === 'roster' ? 'is-on' : ''} onClick={() => setSource('roster')}>З ростера (вручну)</button>
+        </div>
+        <span className="hint">онлайн {people.length} · сінів {sinPool.length} · танків/сікерів {guardPool.length}</span>
       </div>
 
       {source === 'discord' && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <h3 style={{ marginTop: 0 }}>Хто онлайн — з Діскорду</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-            <button type="button" className="btn btn-primary btn-sm" disabled={busy !== null} onClick={postPoll}>
-              {busy === 'post' ? 'Створення…' : '📣 Створити пост збору'}
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={loadReactions}>
-              {busy === 'fetch' ? 'Читання…' : '🔄 Підтягнути реакції'}
-            </button>
-            <button type="button" className={'btn btn-sm ' + (settingsOpen ? 'btn-primary' : 'btn-ghost')} onClick={() => setSettingsOpen((v) => !v)}>
-              ⚙ Текст і пінг
-            </button>
-            {poll && (
-              <button type="button" className="btn btn-bad btn-sm" disabled={busy !== null} onClick={removePoll}>
-                {busy === 'delete' ? 'Прибираю…' : '🗑 Прибрати пост'}
-              </button>
-            )}
-            <span className="hint">
+        <div className="panel">
+          <div className="panel-head">
+            <h3><IcoDiscord /> Хто онлайн — з Діскорду</h3>
+            {poll ? <span className="badge good"><span className="dot live" /> пост є</span> : <span className="badge mute">поста немає</span>}
+            <span className="panel-sub">
               {poll ? (
-                <>
-                  Пост від {kyivTime(poll.postedAt)} · <a className="link" href={poll.url} target="_blank" rel="noreferrer">відкрити в Discord</a>
-                  {fetchedAt && <> · реакції станом на {kyivTime(fetchedAt)}</>}
-                </>
+                <>Пост від {kyivTime(poll.postedAt)}{fetchedAt && <> · реакції станом на {kyivTime(fetchedAt)}</>}</>
               ) : reactions ? (
-                'Поста збору ще немає — створи, і люди відмітяться реакціями.'
+                'створи пост — люди відмітяться реакціями'
               ) : busy === 'fetch' ? (
-                'Читаю реакції…'
+                'читаю реакції…'
               ) : (
-                'Реакції не прочитано — див. помилку нижче.'
+                'реакції не прочитано — див. помилку нижче'
               )}
             </span>
+            {poll && (
+              <div className="panel-actions">
+                <a className="btn btn-quiet btn-xs" href={poll.url} target="_blank" rel="noreferrer">відкрити в Discord →</a>
+              </div>
+            )}
           </div>
-          {actionErr && <p className="form-err" style={{ marginBottom: 12 }}>{actionErr}</p>}
-          {settingsOpen && (settings ? <PostSettings initial={settings} onSaved={setSettings} /> : <p className="hint">Читаю налаштування…</p>)}
-          {poll && discordGroups.length === 0 && <p className="hint">Жодному класу не задано емодзі — Адмінка → Приоритетність класів.</p>}
-          {poll && discordGroups.length > 0 && (
-            <OnlineColumns
-              groups={discordGroups}
-              isOn={(p) => !excludedIds.has(p.id)}
-              onToggle={(p) => setExcludedIds((prev) => toggleIn(prev, p.id))}
-              onAdd={addExtra}
-            />
-          )}
+          <div className="panel-body stack">
+            <div className="row">
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy !== null} onClick={postPoll}>
+                <IcoMegaphone /> {busy === 'post' ? 'Створення…' : 'Створити пост збору'}
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={loadReactions}>
+                <IcoRefresh /> {busy === 'fetch' ? 'Читання…' : 'Підтягнути реакції'}
+              </button>
+              <button type="button" className={'btn btn-ghost btn-sm' + (settingsOpen ? ' is-on' : '')} aria-pressed={settingsOpen} onClick={() => setSettingsOpen((v) => !v)}>
+                <IcoSettings /> Текст і пінг
+              </button>
+              {poll && (
+                <button type="button" className="btn btn-bad btn-sm" disabled={busy !== null} onClick={removePoll}>
+                  <IcoTrash /> {busy === 'delete' ? 'Прибираю…' : 'Прибрати пост'}
+                </button>
+              )}
+            </div>
+            {actionErr && <p className="form-err">{actionErr}</p>}
+            {settingsOpen && (settings ? <PostSettings initial={settings} onSaved={setSettings} /> : <p className="loading"><span className="spinner" /> Читаю налаштування…</p>)}
+            {poll && discordGroups.length === 0 && <p className="hint">Жодному класу не задано емодзі — Адмінка → Приоритетність класів.</p>}
+            {poll && discordGroups.length > 0 && (
+              <OnlineColumns
+                groups={discordGroups}
+                isOn={(p) => !excludedIds.has(p.id)}
+                onToggle={(p) => setExcludedIds((prev) => toggleIn(prev, p.id))}
+                onAdd={addExtra}
+              />
+            )}
+          </div>
         </div>
       )}
 
       {source === 'roster' && (
-        <>
-          <div className="card" style={{ marginBottom: 20 }}>
-            <h3 style={{ marginTop: 0 }}>Класи</h3>
-            <p className="hint" style={{ marginBottom: 12 }}>Кого показувати нижче в списку «онлайн».</p>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {classes.length === 0 && <p className="hint">Спершу додай класи в Адмінці.</p>}
+        <div className="panel">
+          <div className="panel-head">
+            <h3><IcoUsers /> Хто онлайн — з ростера</h3>
+            <span className="panel-sub">обери класи й відміть, хто в грі</span>
+          </div>
+          <div className="panel-body tight" style={{ borderBottom: '1px solid var(--line)' }}>
+            <div className="chips">
+              {classes.length === 0 && <span className="hint">Спершу додай класи в Адмінці.</span>}
               {classes.map((c) => (
                 <button
                   key={c.id}
                   type="button"
-                  className={'btn btn-sm ' + (selectedClassIds.has(c.id) ? 'btn-primary' : 'btn-ghost')}
+                  className={'chip' + (selectedClassIds.has(c.id) ? ' is-on' : '')}
+                  aria-pressed={selectedClassIds.has(c.id)}
                   onClick={() => setSelectedClassIds((prev) => toggleIn(prev, c.id))}
                 >
                   {c.name}
@@ -521,122 +536,140 @@ function RbManager() {
               ))}
             </div>
           </div>
-
-          <div className="card" style={{ marginBottom: 20 }}>
-            <h3 style={{ marginTop: 0 }}>Хто онлайн — з ростера</h3>
+          <div className="panel-body">
             {rosterGroups.length === 0 ? (
               <p className="hint">Нема персонажів вибраних класів — зміни вибір вище або додай гравців у «Гравці» / Адмінці.</p>
             ) : (
               <OnlineColumns groups={rosterGroups} isOn={(p) => onlineIds.has(p.id)} onToggle={(p) => setOnlineIds((prev) => toggleIn(prev, p.id))} />
             )}
           </div>
-        </>
+        </div>
       )}
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Боси під контроль</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
-          {RAID_BOSSES.map((b) => (
-            <label key={b.id} className="checkbox-row">
-              <input type="checkbox" checked={selectedBossIds.has(b.id)} onChange={() => setSelectedBossIds((prev) => toggleIn(prev, b.id))} />
-              <span title={b.name}>{b.nick}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-primary" disabled={selectedBosses.length === 0 || people.length === 0} onClick={distribute}>
-          🔀 Розподілити
-        </button>
-        <span className="hint">На боса: 1 Сін + 1 Танк/Сікер по черзі з відмічених онлайн; хто не влігся — в «Резерві».</span>
-      </div>
-
-      {actionErr && source !== 'discord' && <p className="form-err" style={{ marginBottom: 16 }}>{actionErr}</p>}
-
-      {selectedBosses.length > 0 && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <h3 style={{ marginTop: 0 }}>Розподіл (можна поправити вручну)</h3>
-          <div className="rowlist">
-            <div className="rowlist-head" style={{ gridTemplateColumns: 'minmax(110px, 1fr) 1fr 1fr 110px' }}>
-              <span>Бос</span>
-              <span>Сін</span>
-              <span>Танк/Сікер</span>
-              <span></span>
-            </div>
-            {selectedBosses.map((b) => {
-              const slot = slots[b.id];
-              const sinId = slot?.sinId ?? null;
-              const guardId = slot?.guardId ?? null;
-              return (
-                <div key={b.id} className="rowlist-row" style={{ gridTemplateColumns: 'minmax(110px, 1fr) 1fr 1fr 110px' }}>
-                  <span title={b.name} style={{ fontWeight: 700 }}>{b.nick}</span>
-                  <span>
-                    <select value={sinId ?? ''} onChange={(e) => setSlot(b.id, 'sinId', e.target.value)}>
-                      <option value="">—</option>
-                      {optionsFor(sinPool, sinId).map((p) => (
-                        <option key={p.id} value={p.id}>{p.nickname}</option>
-                      ))}
-                    </select>
-                  </span>
-                  <span>
-                    <select value={guardId ?? ''} onChange={(e) => setSlot(b.id, 'guardId', e.target.value)}>
-                      <option value="">—</option>
-                      {optionsFor(guardPool, guardId).map((p) => (
-                        <option key={p.id} value={p.id}>{p.nickname}</option>
-                      ))}
-                    </select>
-                  </span>
-                  <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button type="button" className="btn btn-ghost btn-sm rb-reset" disabled={!sinId && !guardId} onClick={() => resetSlot(b.id)}>
-                      Скинути
-                    </button>
-                  </span>
-                </div>
-              );
-            })}
+      <div className="panel">
+        <div className="panel-head">
+          <h3><IcoTarget /> Боси під контроль</h3>
+          <span className="badge mute">{selectedBosses.length} з {RAID_BOSSES.length}</span>
+          <div className="panel-actions">
+            <button type="button" className="btn btn-primary btn-sm" disabled={selectedBosses.length === 0 || people.length === 0} onClick={distribute}>
+              <IcoShuffle /> Розподілити
+            </button>
           </div>
-          {reserve.length > 0 && (
-            <p className="hint" style={{ marginTop: 10 }}>
-              Резерв (онлайн, але без боса): {reserve.map((p) => p.nickname).join(', ')}
-            </p>
-          )}
         </div>
-      )}
-
-      {selectedBosses.length > 0 && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-            <h3 style={{ margin: 0 }}>Картинка для гільдії</h3>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" className="btn btn-primary btn-sm" onClick={copyImage}>
-                {copied ? 'Скопійовано ✓' : '📋 Копіювати картинку'}
+        <div className="panel-body">
+          <div className="chips">
+            {RAID_BOSSES.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className={'chip' + (selectedBossIds.has(b.id) ? ' is-on' : '')}
+                aria-pressed={selectedBossIds.has(b.id)}
+                title={b.name}
+                onClick={() => setSelectedBossIds((prev) => toggleIn(prev, b.id))}
+              >
+                {b.nick}
               </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={downloadImage}>⭳ Завантажити PNG</button>
+            ))}
+          </div>
+        </div>
+        <div className="panel-foot">На боса: 1 Сін + 1 Танк/Сікер по черзі з відмічених онлайн; хто не влігся — в «Резерві».</div>
+      </div>
+
+      {actionErr && source !== 'discord' && <p className="form-err">{actionErr}</p>}
+
+      {selectedBosses.length > 0 && (
+        <div className="split main-side">
+          <div className="panel">
+            <div className="panel-head">
+              <h3><IcoShuffle /> Розподіл</h3>
+              <span className="badge mute">{filled} з {selectedBosses.length}</span>
+              <span className="panel-sub">можна поправити вручну</span>
             </div>
+            <div className="panel-body flush">
+              <div className="rowlist">
+                <div className="rowlist-head" style={{ gridTemplateColumns: SLOT_COLS }}>
+                  <span>Бос</span>
+                  <span>Сін</span>
+                  <span>Танк/Сікер</span>
+                  <span></span>
+                </div>
+                {selectedBosses.map((b) => {
+                  const slot = slots[b.id];
+                  const sinId = slot?.sinId ?? null;
+                  const guardId = slot?.guardId ?? null;
+                  return (
+                    <div key={b.id} className="rowlist-row" style={{ gridTemplateColumns: SLOT_COLS }}>
+                      <span title={b.name} className="cell-nick"><b>{b.nick}</b></span>
+                      <span>
+                        <select value={sinId ?? ''} onChange={(e) => setSlot(b.id, 'sinId', e.target.value)}>
+                          <option value="">—</option>
+                          {optionsFor(sinPool, sinId).map((p) => (
+                            <option key={p.id} value={p.id}>{p.nickname}</option>
+                          ))}
+                        </select>
+                      </span>
+                      <span>
+                        <select value={guardId ?? ''} onChange={(e) => setSlot(b.id, 'guardId', e.target.value)}>
+                          <option value="">—</option>
+                          {optionsFor(guardPool, guardId).map((p) => (
+                            <option key={p.id} value={p.id}>{p.nickname}</option>
+                          ))}
+                        </select>
+                      </span>
+                      <span className="cell-actions">
+                        <button type="button" className="btn btn-quiet btn-xs" disabled={!sinId && !guardId} onClick={() => resetSlot(b.id)}>
+                          Скинути
+                        </button>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {reserve.length > 0 && (
+              <div className="panel-foot">
+                <span>Резерв (онлайн, але без боса):</span>
+                <span className="chips">
+                  {reserve.map((p) => <span key={p.id} className="chip static" style={{ height: 24, fontSize: 12 }}>{p.nickname}</span>)}
+                </span>
+              </div>
+            )}
           </div>
 
-          <div ref={printRef} className="rb-print">
-            <div className="rb-print-head">
-              <span className="eyebrow">Thunder</span>
-              <h3>Розподіл по РБ</h3>
-            </div>
-            <div className="rb-print-table">
-              <div className="rb-print-row rb-print-row-head">
-                <span>Бос</span>
-                <span>Сін</span>
-                <span>Танк/Сікер</span>
+          <div className="panel sticky">
+            <div className="panel-head">
+              <h3><IcoImage /> Картинка для гільдії</h3>
+              <div className="panel-actions">
+                <button type="button" className="btn btn-primary btn-sm" onClick={copyImage}>
+                  <IcoCopy /> {copied ? 'Скопійовано ✓' : 'Копіювати'}
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" title="Завантажити PNG" onClick={downloadImage}><IcoDownload /> PNG</button>
               </div>
-              {selectedBosses.map((b) => {
-                const slot = slots[b.id];
-                return (
-                  <div key={b.id} className="rb-print-row">
-                    <span className="rb-print-boss">{b.nick}</span>
-                    <span>{nicknameOf(slot?.sinId ?? null)}</span>
-                    <span>{nicknameOf(slot?.guardId ?? null)}</span>
+            </div>
+            <div className="panel-body">
+              <div ref={printRef} className="rb-print">
+                <div className="rb-print-head">
+                  <span className="eyebrow">Thunder</span>
+                  <h3>Розподіл по РБ</h3>
+                </div>
+                <div className="rb-print-table">
+                  <div className="rb-print-row rb-print-row-head">
+                    <span>Бос</span>
+                    <span>Сін</span>
+                    <span>Танк/Сікер</span>
                   </div>
-                );
-              })}
+                  {selectedBosses.map((b) => {
+                    const slot = slots[b.id];
+                    return (
+                      <div key={b.id} className="rb-print-row">
+                        <span className="rb-print-boss">{b.nick}</span>
+                        <span>{nicknameOf(slot?.sinId ?? null)}</span>
+                        <span>{nicknameOf(slot?.guardId ?? null)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -647,12 +680,14 @@ function RbManager() {
 
 export default function RbPage() {
   return (
-    <div>
+    <div className="page">
       <PageMeta title="РБ — Thunder" />
-      <div className="section-head">
-        <span className="eyebrow">Гільдія</span>
-        <h2>РБ</h2>
-        <p>Розподіл онлайн-персонажів по контрольованих рейд-босах — на картинку для Діскорду.</p>
+      <div className="page-head">
+        <div className="page-head-text">
+          <span className="eyebrow">Керування</span>
+          <h1>РБ</h1>
+          <p>Розподіл онлайн-персонажів по контрольованих рейд-босах — на картинку для Діскорду.</p>
+        </div>
       </div>
       <AdminGate>{() => <RbManager />}</AdminGate>
     </div>

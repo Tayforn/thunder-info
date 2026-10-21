@@ -21,6 +21,7 @@ import AdminGate from '../components/AdminGate';
 import { dateKey } from '../components/AttendanceCalendar';
 import ClassBadge from '../components/ClassBadge';
 import { ClassFilterChips, classOrder, sortByClass, useClassFilter } from '../components/ClassFilter';
+import { IcoBolt, IcoCheck, IcoChevL, IcoChevR, IcoList, IcoUsers } from '../components/Icons';
 import { SortHeader, useColumnSort } from '../app/useColumnSort';
 import { fetchActivities } from '../data/activities';
 import { fetchTodayChecks, setCheck, subscribeToActivityChecks } from '../data/activityChecks';
@@ -90,40 +91,48 @@ function ChecksGrid({
     }
   };
 
-  if (people.length === 0) return <p className="hint">{emptyLabel}</p>;
+  if (people.length === 0) return <p className="rowlist-empty">{emptyLabel}</p>;
 
-  const columns = ['190px', '110px', ...activities.map(() => '130px'), ...(extra ? ['130px'] : [])].join(' ');
-  const minWidth = 350 + (activities.length + (extra ? 1 : 0)) * 130;
+  const columns = ['minmax(170px, 1fr)', '130px', ...activities.map(() => '120px'), ...(extra ? ['110px'] : [])].join(' ');
+  const minWidth = 300 + (activities.length + (extra ? 1 : 0)) * 120;
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <div className="rowlist" style={{ minWidth }}>
-        <div className="rowlist-head" style={{ gridTemplateColumns: columns }}>
-          <span>{personHeader ?? personLabel}</span>
-          <span>{classHeader ?? 'Клас'}</span>
-          {activities.map((a) => (
-            <span key={a.id} title={`${a.points} балів`}>{a.name} · {a.points}</span>
-          ))}
-          {extra && <span>{extra.header}</span>}
-        </div>
-        {people.map((p) => (
-          <div key={p.id} className="rowlist-row" style={{ gridTemplateColumns: columns }}>
-            <span>{p.nickname}</span>
-            <span><ClassBadge cls={p.classId ? classById.get(p.classId) ?? null : null} /></span>
-            {activities.map((a) => (
-              <span key={a.id}>
-                <input
-                  type="checkbox"
-                  checked={checked.has(`${a.id}:${p.id}`)}
-                  onChange={() => toggle(a.id, p.id)}
-                  style={{ accentColor: 'var(--accent)', width: 19, height: 19, cursor: 'pointer' }}
-                />
-              </span>
-            ))}
-            {extra && <span>{extra.render(p)}</span>}
-          </div>
+    <div className="rowlist checks">
+      <div className="rowlist-head" style={{ gridTemplateColumns: columns, minWidth }}>
+        <span>{personHeader ?? personLabel}</span>
+        <span>{classHeader ?? 'Клас'}</span>
+        {activities.map((a) => (
+          <span key={a.id} className="col-act" title={`${a.points} балів`}>
+            {a.name}
+            <small>+{a.points}</small>
+          </span>
         ))}
+        {extra && <span>{extra.header}</span>}
       </div>
+      {people.map((p) => (
+        <div key={p.id} className="rowlist-row" style={{ gridTemplateColumns: columns, minWidth }}>
+          <span className="cell-nick"><b>{p.nickname}</b></span>
+          <span><ClassBadge cls={p.classId ? classById.get(p.classId) ?? null : null} /></span>
+          {activities.map((a) => {
+            const on = checked.has(`${a.id}:${p.id}`);
+            return (
+              <span key={a.id}>
+                <button
+                  type="button"
+                  className={'check lg' + (on ? ' is-on' : '')}
+                  role="checkbox"
+                  aria-checked={on}
+                  aria-label={`${a.name}: ${p.nickname}`}
+                  onClick={() => toggle(a.id, p.id)}
+                >
+                  <IcoCheck />
+                </button>
+              </span>
+            );
+          })}
+          {extra && <span>{extra.render(p)}</span>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -167,7 +176,7 @@ function BonusCell({
       title={bonus?.note ? `Премія: ${bonus.note}` : 'Премія за цей день (порожнє = без премії)'}
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
-      style={{ width: 90 }}
+      style={{ width: 84, textAlign: 'center' }}
     />
   );
 }
@@ -189,19 +198,30 @@ function NewbiesSection({ session, newbies, activities, classById }: {
 
   const todaysActivities = useMemo(() => activities.filter((a) => a.weekdays.includes(todayWeekday())), [activities]);
 
-  if (todaysActivities.length === 0) return <p className="hint">На сьогодні активностей не заплановано.</p>;
-
   return (
-    <ChecksGrid
-      people={newbies}
-      personLabel="Новачок"
-      activities={todaysActivities}
-      checked={checked}
-      setChecked={setChecked}
-      persist={(activityId, newbieId, next) => setCheck(activityId, newbieId, next, session.user.id)}
-      classById={classById}
-      emptyLabel="Спершу додай новачків в Адмінці."
-    />
+    <div className="panel">
+      <div className="panel-head">
+        <h3><IcoList /> Новачки</h3>
+        <span className="badge accent">сьогодні</span>
+        <span className="panel-sub">лише поточний день — бали новачкам нараховує крон увечері</span>
+      </div>
+      <div className="panel-body flush">
+        {todaysActivities.length === 0 ? (
+          <p className="rowlist-empty">На сьогодні активностей не заплановано.</p>
+        ) : (
+          <ChecksGrid
+            people={newbies}
+            personLabel="Новачок"
+            activities={todaysActivities}
+            checked={checked}
+            setChecked={setChecked}
+            persist={(activityId, newbieId, next) => setCheck(activityId, newbieId, next, session.user.id)}
+            classById={classById}
+            emptyLabel="Спершу додай новачків в Адмінці."
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -272,46 +292,61 @@ function PlayersSection({ session, players, activities, classById }: {
     await reload();
   };
 
+  const checkedCount = Array.from(checked).filter((k) => visiblePlayers.some((p) => k.endsWith(`:${p.id}`))).length;
+
   return (
-    <div>
-      <div className="date-nav">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => shiftDay(-1)}>←</button>
-        <input type="date" value={date} max={today} onChange={(e) => e.target.value && e.target.value <= today && setDate(e.target.value)} />
-        <button type="button" className="btn btn-ghost btn-sm" disabled={date >= today} onClick={() => shiftDay(1)}>→</button>
-        {date !== today && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDate(today)}>Сьогодні</button>
-        )}
-        <span className="hint">{WEEKDAY_LABELS_FULL[dow]} — можна масово відмічати й минулі дні.</span>
+    <div className="panel">
+      <div className="panel-head">
+        <h3><IcoUsers /> Гравці</h3>
+        <span className={'badge ' + (date === today ? 'accent' : 'warn')}>{date === today ? 'сьогодні' : WEEKDAY_LABELS_FULL[dow].toLowerCase()}</span>
+        {dayActivities.length > 0 && <span className="panel-sub">відмічено {checkedCount}</span>}
+        <div className="panel-actions">
+          <div className="date-nav">
+            <button type="button" className="btn btn-ghost btn-xs btn-ico" aria-label="Попередній день" onClick={() => shiftDay(-1)}><IcoChevL /></button>
+            <input type="date" value={date} max={today} onChange={(e) => e.target.value && e.target.value <= today && setDate(e.target.value)} />
+            <button type="button" className="btn btn-ghost btn-xs btn-ico" aria-label="Наступний день" disabled={date >= today} onClick={() => shiftDay(1)}><IcoChevR /></button>
+            {date !== today && (
+              <button type="button" className="btn btn-ghost btn-xs" onClick={() => setDate(today)}>Сьогодні</button>
+            )}
+          </div>
+        </div>
       </div>
-      <ClassFilterChips filter={classFilter} />
-      {dayActivities.length === 0 ? (
-        <p className="hint">У цей день активностей не заплановано.</p>
-      ) : visiblePlayers.length === 0 ? (
-        <p className="hint">Під вибраний фільтр не потрапив жоден гравець.</p>
-      ) : (
-        <ChecksGrid
-          people={visiblePlayers}
-          personLabel="Гравець"
-          personHeader={<SortHeader label="Гравець" col="nickname" sort={sort} onToggle={toggleSort} />}
-          classHeader={<SortHeader label="Клас" col="class" sort={sort} onToggle={toggleSort} />}
-          activities={dayActivities}
-          checked={checked}
-          setChecked={setChecked}
-          persist={(activityId, playerId, next) => setPlayerCheckOnDate(activityId, playerId, date, next, session.user.id)}
-          classById={classById}
-          emptyLabel="Спершу додай гравців в Адмінці."
-          extra={{
-            header: 'Премія',
-            render: (p) => (
-              <BonusCell
-                key={`${p.id}:${date}`}
-                bonus={bonuses.get(p.id) ?? null}
-                onCommit={(points, prevNote) => saveBonus(p.id, points, prevNote)}
-              />
-            ),
-          }}
-        />
+      {classFilter.chips.length > 1 && (
+        <div className="panel-body tight" style={{ borderBottom: '1px solid var(--line)' }}>
+          <ClassFilterChips filter={classFilter} />
+        </div>
       )}
+      <div className="panel-body flush">
+        {dayActivities.length === 0 ? (
+          <p className="rowlist-empty">У цей день активностей не заплановано.</p>
+        ) : visiblePlayers.length === 0 ? (
+          <p className="rowlist-empty">Під вибраний фільтр не потрапив жоден гравець.</p>
+        ) : (
+          <ChecksGrid
+            people={visiblePlayers}
+            personLabel="Гравець"
+            personHeader={<SortHeader label="Гравець" col="nickname" sort={sort} onToggle={toggleSort} />}
+            classHeader={<SortHeader label="Клас" col="class" sort={sort} onToggle={toggleSort} />}
+            activities={dayActivities}
+            checked={checked}
+            setChecked={setChecked}
+            persist={(activityId, playerId, next) => setPlayerCheckOnDate(activityId, playerId, date, next, session.user.id)}
+            classById={classById}
+            emptyLabel="Спершу додай гравців в Адмінці."
+            extra={{
+              header: 'Премія',
+              render: (p) => (
+                <BonusCell
+                  key={`${p.id}:${date}`}
+                  bonus={bonuses.get(p.id) ?? null}
+                  onCommit={(points, prevNote) => saveBonus(p.id, points, prevNote)}
+                />
+              ),
+            }}
+          />
+        )}
+      </div>
+      <div className="panel-foot">Можна відмічати й минулі дні — бали гравців рахуються з галочок напряму. Премія — число за день; нотатка «за що» — в календарі на сторінці «Гравці».</div>
     </div>
   );
 }
@@ -342,28 +377,29 @@ function ActivitySections({ session }: { session: Session }) {
   const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
 
   if (err) return <p className="form-err">{err}</p>;
-  if (!newbies || !players || !activities) return <p className="hint">Завантаження…</p>;
+  if (!newbies || !players || !activities) return <p className="loading"><span className="spinner" /> Завантаження…</p>;
 
   return (
-    <div>
-      <p className="hint" style={{ marginBottom: 16 }}>
-        Сьогодні: {WEEKDAY_LABELS_FULL[todayWeekday()]}. Галочки спільні для всіх адмінів і оновлюються в реальному часі.
-      </p>
-      <h3>Новачки</h3>
+    <>
       <NewbiesSection session={session} newbies={newbies} activities={activities} classById={classById} />
-      <h3 style={{ marginTop: 28 }}>Гравці</h3>
       <PlayersSection session={session} players={players} activities={activities} classById={classById} />
-    </div>
+    </>
   );
 }
 
 export default function ActivityPage() {
   return (
-    <div>
+    <div className="page">
       <PageMeta title="Активність — Thunder" />
-      <div className="section-head">
-        <span className="eyebrow">Гільдія</span>
-        <h2>Активність</h2>
+      <div className="page-head">
+        <div className="page-head-text">
+          <span className="eyebrow">Керування</span>
+          <h1>Активність</h1>
+          <p>Галочки спільні для всіх адмінів і оновлюються в реальному часі.</p>
+        </div>
+        <div className="page-head-actions">
+          <span className="badge"><IcoBolt style={{ width: 12, height: 12 }} /> {WEEKDAY_LABELS_FULL[todayWeekday()]}</span>
+        </div>
       </div>
       <AdminGate>{(session) => <ActivitySections session={session} />}</AdminGate>
     </div>

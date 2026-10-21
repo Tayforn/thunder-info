@@ -33,6 +33,9 @@ jobs:
           VITE_BASE: /
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Блок турнірів PvP на Головній — Supabase-проєкт pw-pvp (без секретів блок просто не показується)
+          VITE_PVP_SUPABASE_URL: ${{ secrets.VITE_PVP_SUPABASE_URL }}
+          VITE_PVP_SUPABASE_ANON_KEY: ${{ secrets.VITE_PVP_SUPABASE_ANON_KEY }}
 
       - name: Upload release
         env:

@@ -9,10 +9,8 @@
 // Пост веде Edge Function discord-events (крон кожні 5 хв). Тут — стан
 // поста і кнопки "Оновити зараз" / "Почистити пінги", щоб не чекати крону.
 //
-// Верстка рядка — три лінії (не AdminTable: полів забагато для колонок):
-//   1) назва + «коли» (щотижня/дата, дні);
-//   2) час · пінг · тривалість · роль · увімк. · дії;
-//   3) примітка на всю ширину (кілька рядків, посилання).
+// Картка евента — панель: смужка (назва + «коли» + увімк.), тіло (час ·
+// пінг · тривалість · роль; примітка + картинка), підвал (джерело, дії).
 // =========================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -21,6 +19,7 @@ import { errorMessage, reportError } from '../app/errorMessage';
 import { supabase } from '../app/supabaseClient';
 import { useAuth } from '../app/useAuth';
 import AdminGate from '../components/AdminGate';
+import { IcoCal, IcoDiscord, IcoImage, IcoPlus, IcoRefresh, IcoTrash } from '../components/Icons';
 import WeekdayPicker from '../components/WeekdayPicker';
 import { fetchActivities } from '../data/activities';
 import {
@@ -161,7 +160,7 @@ function ImageField({ value, onChange }: { value: string | null; onChange: (url:
           <a href={value} target="_blank" rel="noreferrer" title="Відкрити картинку">
             <img src={value} alt="" />
           </a>
-          <button type="button" className="btn btn-ghost btn-sm" title="Прибрати картинку" disabled={busy} onClick={() => onChange(null)}>
+          <button type="button" className="btn btn-ghost btn-xs btn-ico" title="Прибрати картинку" disabled={busy} onClick={() => onChange(null)}>
             ✕
           </button>
         </div>
@@ -171,21 +170,21 @@ function ImageField({ value, onChange }: { value: string | null; onChange: (url:
             type="text"
             value={text}
             disabled={busy}
-            placeholder={busy ? 'Завантаження…' : '🖼 Картинка: Ctrl+V'}
+            placeholder={busy ? 'Завантаження…' : 'Картинка: Ctrl+V або посилання'}
             title="Скопіюй картинку (у Discord: ПКМ → Копіювати зображення) і натисни тут Ctrl+V. Можна перетягнути файл або вставити посилання."
             onPaste={onPaste}
             onChange={(ev) => setText(ev.target.value)}
             onKeyDown={(ev) => ev.key === 'Enter' && text.trim() && fromUrl(text)}
             onBlur={() => text.trim() && fromUrl(text)}
           />
-          <button type="button" className="btn btn-ghost btn-sm" title="Вибрати файл" disabled={busy} onClick={() => fileRef.current?.click()}>
-            📁
+          <button type="button" className="btn btn-ghost btn-sm btn-ico" style={{ width: 36, height: 36 }} title="Вибрати файл" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <IcoImage />
           </button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(ev) => { fromFile(ev.target.files?.[0]); ev.target.value = ''; }} />
         </div>
       )}
       {expiry && (
-        <span className="hint event-image-warn">
+        <span className="hint warn-text">
           Тимчасове посилання Discord{expiry.getTime() > Date.now() ? `, спливе ${expiry.toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' })}` : ', вже не працює'}. Краще встав саму картинку: у Discord ПКМ → «Копіювати зображення» → тут Ctrl+V.
         </span>
       )}
@@ -225,16 +224,12 @@ function WhenPicker({ weekdays, eventDate, onChange }: { weekdays: number[]; eve
   const dated = eventDate !== null;
   return (
     <div className="event-when">
-      <div className="event-when-mode">
-        <button type="button" className={'btn btn-sm ' + (!dated ? 'btn-primary' : 'btn-ghost')} onClick={() => dated && onChange({ eventDate: null })}>
-          Щотижня
-        </button>
-        <button type="button" className={'btn btn-sm ' + (dated ? 'btn-primary' : 'btn-ghost')} onClick={() => !dated && onChange({ eventDate: kyivDateString() })}>
-          Дата
-        </button>
+      <div className="seg seg-sm" role="group" aria-label="Коли">
+        <button type="button" className={!dated ? 'is-on' : ''} onClick={() => dated && onChange({ eventDate: null })}>Щотижня</button>
+        <button type="button" className={dated ? 'is-on' : ''} onClick={() => !dated && onChange({ eventDate: kyivDateString() })}>Дата</button>
       </div>
       {dated ? (
-        <input type="date" value={eventDate ?? ''} onChange={(e) => e.target.value && onChange({ eventDate: e.target.value })} />
+        <input type="date" className="input input-sm" value={eventDate ?? ''} onChange={(e) => e.target.value && onChange({ eventDate: e.target.value })} />
       ) : (
         <WeekdayPicker value={weekdays} onChange={(v) => onChange({ weekdays: v })} />
       )}
@@ -284,25 +279,32 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
   };
 
   return (
-    <div className="card events-card">
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>Пост у Discord</div>
-        {state ? (
-          <div className="hint">
-            Зараз показує {dateLabel(state.postDate)}, останні зміни {when(state.updatedAt)}. Крон перевіряє його кожні 5 хв.
-          </div>
-        ) : (
-          <div className="hint">Ще не створений — натисни «Оновити зараз» або дочекайся крону (див. supabase/DISCORD.md).</div>
-        )}
-        {result && <div className="hint" style={{ marginTop: 4, color: 'var(--good)' }}>{result}</div>}
-        {err && <p className="form-err" style={{ marginTop: 4 }}>{err}</p>}
+    <div className="panel">
+      <div className="panel-head">
+        <h3><IcoDiscord /> Пост у Discord</h3>
+        {state ? <span className="badge good"><span className="dot live" /> працює</span> : <span className="badge warn">ще не створений</span>}
+        <span className="panel-sub">крон перевіряє кожні 5 хв</span>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="panel-body tight" style={{ flex: '1 1 auto' }}>
+        {state ? (
+          <dl className="kv">
+            <dt>Показує</dt>
+            <dd>{dateLabel(state.postDate)}</dd>
+            <dt>Останні зміни</dt>
+            <dd>{when(state.updatedAt)}</dd>
+          </dl>
+        ) : (
+          <span className="hint">Натисни «Оновити зараз» або дочекайся крону (див. supabase/DISCORD.md).</span>
+        )}
+        {result && <div className="hint good-text" style={{ marginTop: 6 }}>{result}</div>}
+        {err && <p className="form-err" style={{ marginTop: 6 }}>{err}</p>}
+      </div>
+      <div className="panel-foot" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="btn btn-ghost btn-sm" disabled={busy !== null} title="Видалити з каналу всі надіслані нагадування; пост лишається" onClick={() => run('clean')}>
           {busy === 'clean' ? 'Чищення…' : 'Почистити пінги'}
         </button>
         <button type="button" className="btn btn-primary btn-sm" disabled={busy !== null} onClick={() => run('sync')}>
-          {busy === 'sync' ? 'Оновлення…' : 'Оновити зараз'}
+          <IcoRefresh /> {busy === 'sync' ? 'Оновлення…' : 'Оновити зараз'}
         </button>
       </div>
     </div>
@@ -310,12 +312,12 @@ function DiscordStatus({ state, onSynced }: { state: DiscordPostState | null; on
 }
 
 // ---------------------------------------------------------
-// Рядок евента.
+// Картка евента.
 // ---------------------------------------------------------
 
 type Patch = Parameters<typeof updateEvent>[1];
 
-function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: GuildEvent; activity: Activity | undefined; onPatch: (p: Patch) => void; onPull: () => void; onDelete: () => void }) {
+function EventCard({ event: e, activity, onPatch, onPull, onDelete }: { event: GuildEvent; activity: Activity | undefined; onPatch: (p: Patch) => void; onPull: () => void; onDelete: () => void }) {
   const diverged = divergedFromActivity(e, activity);
   const [testing, setTesting] = useState(false);
   const target = e.pingRoleId?.trim() || 'роль за замовчуванням';
@@ -331,57 +333,68 @@ function EventRow({ event: e, activity, onPatch, onPull, onDelete }: { event: Gu
       setTesting(false);
     }
   };
+  const noDays = !e.eventDate && e.weekdays.length === 0;
+
   return (
-    <div className={'rowlist-row event-row' + (e.enabled ? '' : ' off')}>
-      <div className="event-line">
+    <div className={'panel event' + (e.enabled ? '' : ' off')}>
+      <div className="panel-head">
         <TextInput className="event-name" initial={e.name} onSave={(v) => onPatch({ name: v })} />
         <WhenPicker weekdays={e.weekdays} eventDate={e.eventDate} onChange={onPatch} />
-      </div>
-
-      <div className="event-line">
-        <label className="ctl" title="Час початку за Києвом; порожньо = без часу (у пості без години, без пінгу й «Події»)">
-          час <TimeInput initial={e.startTime} onSave={(v) => onPatch({ startTime: v })} />
-        </label>
-        <label className="ctl" title="За скільки хвилин до початку пінгнути роль у каналі; порожньо = не пінгувати">
-          пінг за <MinutesInput initial={e.pingMinutesBefore} min={1} max={180} onSave={(v) => onPatch({ pingMinutesBefore: v })} /> хв
-        </label>
-        <label className="ctl" title="Тривалість для «Події» Discord; порожньо = 60 хв">
-          триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => onPatch({ durationMinutes: v })} /> хв
-        </label>
-        <label className="ctl" title="Кого пінгувати: ID ролі, everyone (усі, хто бачить канал) або here (лише онлайн); порожньо = значення за замовчуванням із секретів">
-          роль <TextInput className="ctl-role" initial={e.pingRoleId ?? ''} placeholder="ID ролі / everyone" allowEmpty onSave={(v) => onPatch({ pingRoleId: v })} />
-        </label>
-        <label className="ctl ctl-on" title={e.enabled ? 'Увімкнено — потрапляє в пост і «Події»' : 'Вимкнено — у пост не потрапляє'}>
-          <input type="checkbox" checked={e.enabled} onChange={(ev) => onPatch({ enabled: ev.target.checked })} /> увімк.
-        </label>
-        <div className="event-actions">
-          {activity && !diverged && <span className="hint event-src">з активності «{activity.name}»</span>}
-          {diverged && activity && (
-            <button type="button" className="btn btn-ghost btn-sm" title={`Підтягнути назву і дні з активності «${activity.name}» (${activity.weekdays.map((d) => WEEKDAY_LABELS[d]).join(', ') || 'без днів'})`} onClick={onPull}>
-              ↻ з активності
-            </button>
-          )}
-          <button type="button" className="btn btn-ghost btn-sm" disabled={testing} title="Надіслати пінг цього евента в канал зараз — перевірити роль / @everyone" onClick={testPing}>
-            {testing ? '…' : 'Тест пінгу'}
-          </button>
-          <button type="button" className="btn btn-bad btn-sm" onClick={() => confirm(`Видалити евент «${e.name}»?`) && onDelete()}>
-            Видалити
-          </button>
+        <div className="panel-actions">
+          <label className="switch" title={e.enabled ? 'Увімкнено — потрапляє в пост і «Події»' : 'Вимкнено — у пост не потрапляє'}>
+            <input type="checkbox" checked={e.enabled} onChange={(ev) => onPatch({ enabled: ev.target.checked })} />
+            <span className="switch-track" />
+            <span>{e.enabled ? 'увімк.' : 'вимк.'}</span>
+          </label>
         </div>
       </div>
 
-      <div className="event-note-line">
-        <NoteInput initial={e.note ?? ''} onSave={(v) => onPatch({ note: v })} />
-        <ImageField
-          value={e.imageUrl}
-          onChange={(url) => {
-            const old = e.imageUrl;
-            onPatch({ imageUrl: url });
-            if (old && old !== url) removeEventImage(old);
-          }}
-        />
+      <div className="panel-body stack sm">
+        <div className="event-ctl">
+          <label className="ctl" title="Час початку за Києвом; порожньо = без часу (у пості без години, без пінгу й «Події»)">
+            час <TimeInput initial={e.startTime} onSave={(v) => onPatch({ startTime: v })} />
+          </label>
+          <label className="ctl" title="За скільки хвилин до початку пінгнути роль у каналі; порожньо = не пінгувати">
+            пінг за <MinutesInput initial={e.pingMinutesBefore} min={1} max={180} onSave={(v) => onPatch({ pingMinutesBefore: v })} /> хв
+          </label>
+          <label className="ctl" title="Тривалість для «Події» Discord; порожньо = 60 хв">
+            триває <MinutesInput initial={e.durationMinutes} min={5} max={1440} placeholder="60" onSave={(v) => onPatch({ durationMinutes: v })} /> хв
+          </label>
+          <label className="ctl" title="Кого пінгувати: ID ролі, everyone (усі, хто бачить канал) або here (лише онлайн); порожньо = значення за замовчуванням із секретів">
+            роль <TextInput className="ctl-role" initial={e.pingRoleId ?? ''} placeholder="ID ролі / everyone" allowEmpty onSave={(v) => onPatch({ pingRoleId: v })} />
+          </label>
+        </div>
+
+        <div className="event-note-line">
+          <NoteInput initial={e.note ?? ''} onSave={(v) => onPatch({ note: v })} />
+          <ImageField
+            value={e.imageUrl}
+            onChange={(url) => {
+              const old = e.imageUrl;
+              onPatch({ imageUrl: url });
+              if (old && old !== url) removeEventImage(old);
+            }}
+          />
+        </div>
       </div>
-      {!e.eventDate && e.weekdays.length === 0 && <span className="hint event-warn">Дні не вибрано — у пост не потрапить.</span>}
+
+      <div className="panel-foot event-foot">
+        {noDays && <span className="badge warn">дні не вибрано — у пост не потрапить</span>}
+        {activity && !diverged && <span className="hint">з активності «{activity.name}»</span>}
+        {diverged && activity && (
+          <button type="button" className="btn btn-ghost btn-xs" title={`Підтягнути назву і дні з активності «${activity.name}» (${activity.weekdays.map((d) => WEEKDAY_LABELS[d]).join(', ') || 'без днів'})`} onClick={onPull}>
+            <IcoRefresh /> з активності
+          </button>
+        )}
+        <div className="event-actions">
+          <button type="button" className="btn btn-ghost btn-xs" disabled={testing} title="Надіслати пінг цього евента в канал зараз — перевірити роль / @everyone" onClick={testPing}>
+            {testing ? '…' : 'Тест пінгу'}
+          </button>
+          <button type="button" className="btn btn-bad btn-xs" onClick={() => confirm(`Видалити евент «${e.name}»?`) && onDelete()}>
+            <IcoTrash /> Видалити
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -453,66 +466,90 @@ function EventsPanel() {
     patch(e.id, { name: a.name, weekdays: a.weekdays });
   };
 
+  const enabledCount = events.filter((e) => e.enabled).length;
+
   return (
-    <div className="events-admin">
-      <p className="hint" style={{ marginTop: 0 }}>
-        Що піде в щоденний пост у Discord. Нові активності з'являються тут самі; назву, дні, час і пінг можна міняти незалежно
-        від «Активностей». Евент із часом і пінгом нагадує в каналі за N хв до початку. Усе за київським часом.
-      </p>
+    <div className="stack">
+      <div className="split two">
+        <DiscordStatus state={postState} onSynced={() => fetchDiscordPostState().then(setPostState).catch(() => undefined)} />
 
-      <DiscordStatus state={postState} onSynced={() => fetchDiscordPostState().then(setPostState).catch(() => undefined)} />
-
-      <div className="card events-card" style={{ display: 'block' }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Сьогодні в пості — {todayLabel}</div>
-        {today.length === 0 ? (
-          <div className="hint">Сьогодні евентів немає.</div>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 2 }}>
-            {today.map((e) => (
-              <li key={e.id}>
-                {e.startTime ? <b>{e.startTime}</b> : <span className="hint">без часу</span>} — {e.name}
-                {e.startTime && e.pingMinutesBefore ? <span className="hint"> · пінг за {e.pingMinutesBefore} хв</span> : null}
-                {e.note ? <span className="hint"> · {e.note.split('\n')[0]}{e.note.includes('\n') ? ' …' : ''}</span> : null}
-                {e.imageUrl ? <span className="hint"> · 🖼</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="panel">
+          <div className="panel-head">
+            <h3><IcoCal /> Сьогодні в пості</h3>
+            <span className="panel-sub">{todayLabel}</span>
+            {today.length > 0 && <span className="badge accent">{today.length}</span>}
+          </div>
+          <div className="panel-body tight">
+            {today.length === 0 ? (
+              <span className="hint">Сьогодні евентів немає.</span>
+            ) : (
+              <div className="timeline">
+                {today.map((e) => (
+                  <div key={e.id} className="timeline-item">
+                    {e.startTime ? <span className="timeline-time">{e.startTime}</span> : <span className="timeline-time mute">без часу</span>}
+                    <div className="timeline-body">
+                      <b>{e.name}</b>
+                      <div className="timeline-meta">
+                        {e.startTime && e.pingMinutesBefore ? <span>пінг за {e.pingMinutesBefore} хв</span> : null}
+                        {e.note ? <span>{e.note.split('\n')[0]}{e.note.includes('\n') ? ' …' : ''}</span> : null}
+                        {e.imageUrl ? <span><IcoImage style={{ width: 12, height: 12, verticalAlign: '-2px' }} /> картинка</span> : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {missing.length > 0 && (
-        <div className="card events-card">
-          <div className="hint">
+        <div className="notice warn">
+          <span className="grow">
             Активності без евента: <b>{missing.map((a) => a.name).join(', ')}</b>
+          </span>
+          <div className="notice-acts">
+            <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => importActivities(missing).then(reload).catch(reportError)}>
+              <IcoPlus /> Підтягнути з активностей
+            </button>
           </div>
-          <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => importActivities(missing).then(reload).catch(reportError)}>
-            Підтягнути з активностей
-          </button>
         </div>
       )}
 
-      <div className="event-list">
-        {events.length === 0 ? (
-          <p className="rowlist-empty hint">Евентів ще немає — додай нижче або підтягни з активностей.</p>
-        ) : (
-          events.map((e) => (
-            <EventRow
-              key={e.id}
-              event={e}
-              activity={e.activityId ? activityById.get(e.activityId) : undefined}
-              onPatch={(p) => patch(e.id, p)}
-              onPull={() => pullFromActivity(e)}
-              onDelete={() => deleteEvent(e.id).then(() => removeEventImage(e.imageUrl)).then(reload).catch(reportError)}
-            />
-          ))
-        )}
+      <div className="section-head row">
+        <div>
+          <span className="eyebrow">Евенти</span>
+          <h2>Розклад</h2>
+        </div>
+        <span className="hint">увімкнено {enabledCount} з {events.length} · усе за київським часом</span>
+      </div>
 
-        <div className="rowlist-row event-row event-add">
-          <div className="event-line">
-            <span className="event-add-title">Новий евент</span>
-          </div>
-          <div className="event-line">
-            <input type="text" className="event-name" value={newName} placeholder="Назва евенту" onChange={(e) => setNewName(e.target.value)} />
+      {events.length === 0 ? (
+        <div className="empty">
+          <IcoCal />
+          <b>Евентів ще немає</b>
+          <span>Додай нижче або підтягни з активностей.</span>
+        </div>
+      ) : (
+        events.map((e) => (
+          <EventCard
+            key={e.id}
+            event={e}
+            activity={e.activityId ? activityById.get(e.activityId) : undefined}
+            onPatch={(p) => patch(e.id, p)}
+            onPull={() => pullFromActivity(e)}
+            onDelete={() => deleteEvent(e.id).then(() => removeEventImage(e.imageUrl)).then(reload).catch(reportError)}
+          />
+        ))
+      )}
+
+      <div className="panel dashed event">
+        <div className="panel-head">
+          <h3><IcoPlus /> Новий евент</h3>
+        </div>
+        <div className="panel-body stack sm">
+          <div className="row">
+            <input type="text" className="event-name" style={{ borderColor: 'var(--line-2)' }} value={newName} placeholder="Назва евенту" onChange={(e) => setNewName(e.target.value)} />
             <WhenPicker
               weekdays={newWeekdays}
               eventDate={newDate}
@@ -522,16 +559,14 @@ function EventsPanel() {
               }}
             />
           </div>
-          <div className="event-line">
+          <div className="event-ctl">
             <label className="ctl">
               час <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
             </label>
             <label className="ctl">
               пінг за <input type="number" min={1} max={180} value={newPing} placeholder="—" onChange={(e) => setNewPing(e.target.value)} /> хв
             </label>
-            <div className="event-actions">
-              <button type="button" className="btn btn-primary btn-sm" disabled={busy || !newName.trim()} onClick={add}>+ Додати</button>
-            </div>
+            <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} disabled={busy || !newName.trim()} onClick={add}><IcoPlus /> Додати</button>
           </div>
         </div>
       </div>
@@ -543,14 +578,22 @@ function EventsPanel() {
 export default function DsEventsPage() {
   const { session } = useAuth();
   return (
-    <div>
+    <div className="page">
       <PageMeta title="ДС Евенти — Thunder" />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="section-head">
-        <div>
+      <div className="page-head">
+        <div className="page-head-text">
           <span className="eyebrow">Discord</span>
-          <h2>ДС Евенти</h2>
+          <h1>ДС Евенти</h1>
+          <p>
+            Що піде в щоденний пост у Discord. Нові активності з'являються тут самі; назву, дні, час і пінг можна міняти
+            незалежно від «Активностей». Евент із часом і пінгом нагадує в каналі за N хв до початку.
+          </p>
         </div>
-        {session && <button type="button" className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Вийти</button>}
+        {session && (
+          <div className="page-head-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>Вийти</button>
+          </div>
+        )}
       </div>
       <AdminGate allow="events">{() => <EventsPanel />}</AdminGate>
     </div>

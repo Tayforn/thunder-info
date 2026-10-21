@@ -1,9 +1,12 @@
 // =========================================================
 // Мультиселект днів тижня (0=неділя..6=субота, як Postgres extract(dow))
-// — спільний для табів "Активності" та "Евенти".
+// — спільний для табів "Активності" та "Евенти". Показуємо Пн..Нд, зберігаємо
+// у системі dow.
 // =========================================================
 
 import { WEEKDAY_LABELS } from '../data/types';
+
+const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export default function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: number[]) => void }) {
   const toggle = (d: number) => {
@@ -11,16 +14,10 @@ export default function WeekdayPicker({ value, onChange }: { value: number[]; on
     onChange(next);
   };
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {WEEKDAY_LABELS.map((label, d) => (
-        <button
-          key={d}
-          type="button"
-          className={'btn btn-sm ' + (value.includes(d) ? 'btn-primary' : 'btn-ghost')}
-          style={{ padding: '4px 9px', fontSize: 12 }}
-          onClick={() => toggle(d)}
-        >
-          {label}
+    <div className="seg seg-sm" role="group" aria-label="Дні тижня">
+      {ORDER.map((d) => (
+        <button key={d} type="button" className={value.includes(d) ? 'is-on' : ''} aria-pressed={value.includes(d)} onClick={() => toggle(d)}>
+          {WEEKDAY_LABELS[d]}
         </button>
       ))}
     </div>

@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { reportError } from '../app/errorMessage';
 import type { Activity, PlayerBonus } from '../data/types';
 import { kyivDateString } from '../data/types';
+import { IcoCheck } from './Icons';
 
 export const MONTH_NOM = [
   'Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
@@ -25,6 +26,12 @@ const WEEK_HEAD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'] as co
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const dateKey = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+/** YYYY-MM-DD → DD.MM.YYYY */
+function prettyDate(key: string): string {
+  const [y, m, d] = key.split('-');
+  return `${d}.${m}.${y}`;
+}
 
 interface DayInfo {
   key: string;
@@ -92,14 +99,14 @@ function BonusEditor({
   };
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 12 }}>
-      <label className="field" style={{ flex: '0 0 110px' }}>
+    <div className="bonus-editor">
+      <label className="field narrow">
         <span>Премія, балів</span>
-        <input type="number" min={1} value={points} onChange={(e) => setPoints(e.target.value)} />
+        <input type="number" min={1} value={points} className="input-sm" onChange={(e) => setPoints(e.target.value)} />
       </label>
-      <label className="field" style={{ flex: '1 1 180px' }}>
+      <label className="field">
         <span>За що (необовʼязково)</span>
-        <input type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+        <input type="text" value={note} className="input-sm" onChange={(e) => setNote(e.target.value)} />
       </label>
       <button type="button" className="btn btn-primary btn-sm" disabled={busy || !valid} onClick={() => run(() => onSave(parsed, note))}>
         {bonus ? 'Оновити премію' : '★ Видати премію'}
@@ -164,8 +171,25 @@ export default function AttendanceCalendar({ year, month, activities, checksByDa
     };
   }, [days]);
 
+  const pct = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : null;
+
   return (
-    <div>
+    <div className="stack">
+      <div className="tiles">
+        <div className={'tile' + (pct === null ? '' : pct >= 80 ? ' good' : pct >= 50 ? ' warn' : ' bad')}>
+          <span className="tile-l">Відвідано</span>
+          <span className="tile-v">{totals.attended}<small>з {totals.total}</small></span>
+          <span className="tile-s">{pct === null ? 'активностей ще не було' : `${pct}% за місяць`}</span>
+        </div>
+        {showPoints && (
+          <div className="tile accent">
+            <span className="tile-l">Балів</span>
+            <span className="tile-v">{totals.points + totals.bonus}</span>
+            <span className="tile-s">{totals.bonus > 0 ? `з них премій: ${totals.bonus}` : 'за активності'}</span>
+          </div>
+        )}
+      </div>
+
       <div className="att-cal">
         {WEEK_HEAD.map((w) => (
           <span key={w} className="att-cal-head">{w}</span>
@@ -192,53 +216,60 @@ export default function AttendanceCalendar({ year, month, activities, checksByDa
         ))}
       </div>
 
-      <p className="hint" style={{ marginTop: 10 }}>
-        За місяць відвідано <b>{totals.attended}</b> з <b>{totals.total}</b> активностей
-        {showPoints && <> · балів: <b>{totals.points + totals.bonus}</b>{totals.bonus > 0 && <> (з них премій: {totals.bonus})</>}</>}.
-        Клікни на день, щоб побачити деталі{onSaveBonus ? ' або видати премію' : ''}.
-      </p>
+      <div className="row between">
+        <span className="legend">
+          <span><i className="sw full" /> усе</span>
+          <span><i className="sw partial" /> частково</span>
+          <span><i className="sw miss" /> пропуск</span>
+          <span><i className="sw none" /> без активностей</span>
+        </span>
+        <span className="hint">Клікни на день — деталі{onSaveBonus ? ' або премія' : ''}.</span>
+      </div>
 
       {selected && (
-        <div className="card" style={{ padding: 14, marginTop: 10 }}>
-          <b>{selected.key}</b>
+        <div className="cal-day">
+          <div className="cal-day-head">
+            <b>{prettyDate(selected.key)}</b>
+            {selected.state !== 'future' && selected.items.length > 0 && (
+              <span className={'badge ' + (selected.state === 'full' ? 'good' : selected.state === 'partial' ? 'warn' : 'bad')}>
+                {selected.attended} / {selected.items.length}
+              </span>
+            )}
+          </div>
           {selected.state === 'future' ? (
-            <p className="hint" style={{ marginTop: 6 }}>Цей день ще попереду.</p>
+            <p className="hint">Цей день ще попереду.</p>
           ) : selected.items.length === 0 ? (
-            <p className="hint" style={{ marginTop: 6 }}>Активностей не заплановано.</p>
+            <p className="hint">Активностей не заплановано.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+            <div className="cal-acts">
               {selected.items.map(({ activity, attended }) => {
-                const label = (
+                const inner = (
                   <>
-                    {attended ? '✓' : '✗'} {activity.name}
-                    {showPoints && attended && activity.points > 0 && <> · {activity.points}</>}
+                    <span className={'check' + (attended ? ' is-on' : '')} aria-hidden="true"><IcoCheck /></span>
+                    <span>{activity.name}</span>
+                    {showPoints && attended && activity.points > 0 && <span className="pts">+{activity.points}</span>}
                   </>
                 );
                 return onToggleCheck ? (
                   <button
                     key={activity.id}
                     type="button"
-                    className={'badge ' + (attended ? 'good' : 'bad')}
-                    style={{ width: 'fit-content', cursor: 'pointer', font: 'inherit' }}
+                    className={'cal-act' + (attended ? ' on' : '')}
                     disabled={toggleBusy}
                     title={attended ? 'Клікни, щоб зняти галочку' : 'Клікни, щоб позначити відвіданою'}
                     onClick={() => toggleCheck(selected.key, activity.id, !attended)}
                   >
-                    {label}
+                    {inner}
                   </button>
                 ) : (
-                  <span key={activity.id} className={'badge ' + (attended ? 'good' : 'bad')} style={{ width: 'fit-content' }}>
-                    {label}
-                  </span>
+                  <span key={activity.id} className={'cal-act' + (attended ? ' on' : '')}>{inner}</span>
                 );
               })}
-              {onToggleCheck && (
-                <small className="hint">Клік по активності ставить або знімає галочку.</small>
-              )}
+              {onToggleCheck && <small className="hint">Клік по активності ставить або знімає галочку.</small>}
             </div>
           )}
           {selected.bonus && (
-            <p className="badge warn" style={{ display: 'inline-flex', width: 'fit-content', marginTop: 10 }}>
+            <p className="badge warn" style={{ marginTop: 10 }}>
               ★ Премія: {selected.bonus.points}{selected.bonus.note ? ` — ${selected.bonus.note}` : ''}
             </p>
           )}

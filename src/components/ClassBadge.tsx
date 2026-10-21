@@ -10,8 +10,8 @@ export default function ClassBadge({ cls }: { cls: ClassRow | null | undefined }
   const cls2 = variant === 'neutral' ? 'badge' : `badge ${variant}`;
   return (
     <span className={cls2} title={`Коефіцієнт: ${cls.coef}`}>
+      {variant === 'priority' && <span aria-hidden="true">⚡</span>}
       {cls.name}
-      {variant === 'priority' && ' ⚡'}
     </span>
   );
 }
