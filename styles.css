@@ -220,9 +220,10 @@ html.nav-open .nav-toggle-bars::after  { transform: translateY(-5.5px) rotate(-4
 .me-chip-x { color: var(--text-mute); font-size: 12px; flex: none; }
 .me-chip:hover .me-chip-x { color: var(--bad); }
 
-.theme-ico-sun, .theme-ico-moon { display: none; }
-html[data-theme="dark"]  .theme-ico-sun  { display: block; }
-html[data-theme="light"] .theme-ico-moon { display: block; }
+/* Специфічність вища за `.icon-btn svg { display: block }` — інакше видно обидві іконки. */
+.icon-btn svg.theme-ico-sun, .icon-btn svg.theme-ico-moon { display: none; }
+html[data-theme="dark"]  .icon-btn svg.theme-ico-sun  { display: block; }
+html[data-theme="light"] .icon-btn svg.theme-ico-moon { display: block; }
 
 @media (max-width: 720px) {
   .hdr-links { display: none; }
