@@ -916,6 +916,7 @@ button.cal-act:hover:not(:disabled) { border-color: var(--line-2); background: v
 .rb-online-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .rb-online .cal-act { padding: 5px 8px; }
 .rb-add { margin-top: 4px; }
+.rb-online .cal-act.is-locked { cursor: default; opacity: 0.6; }
 .rb-print {
   display: inline-block; min-width: 320px; max-width: 100%; padding: 18px 22px 20px;
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); border: 1px solid var(--line-2); border-radius: var(--radius-lg);

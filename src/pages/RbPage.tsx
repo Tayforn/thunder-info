@@ -1,15 +1,15 @@
 // =========================================================
 // /rb — адмінська сторінка розподілу людей по контрольованих РБ.
 //
-// Хто онлайн — з одного з двох джерел:
-//  * Discord (за замовчуванням): пост «Збір на РБ» з реакціями-класами
-//    (емодзі кожного класу — Адмінка → Приоритетність класів), сторінка
-//    читає, хто натиснув (Edge Function discord-events, бот). Нік — з
-//    Discord, клас — з емодзі; зіставлення з ростером сайту нема свідомо.
-//    Зайвих можна зняти чекбоксом, когось без реакції — дописати руками.
+// Хто онлайн — сума трьох джерел, усі одночасно:
+//  * Discord: пост «Збір на РБ» з реакціями-класами (емодзі кожного класу —
+//    Адмінка → Приоритетність класів), сторінка читає, хто натиснув (Edge
+//    Function discord-events, бот). Нік — з Discord, клас — з емодзі.
+//    Зайвих можна зняти, когось без реакції — дописати ніком у колонку.
 //  * Ростер: вибір класів (за замовчуванням Танк/Сікер/Сін) і чеклист
-//    персонажів з таблиці players — запасний режим без Discord.
-// Далі однаково: чеклист босів (статичний список, узгоджений з
+//    персонажів з таблиці players — для тих, хто в грі, але не реагував.
+//    Нік, що вже прийшов з Discord (той самий клас-роль), не дублюється.
+// Далі: чеклист босів (статичний список, узгоджений з
 // calc.thunderpw.fun/rb — data/raidBosses.ts), «Розподілити» — на кожного
 // відміченого боса по черзі 1 Сін + 1 Танк/Сікер (хто не влігся — в
 // «Резерві»), селекти для ручних правок (лише своя роль, без уже
@@ -39,7 +39,6 @@ import {
 import type { ClassRow, Player } from '../data/types';
 
 type Kind = 'sin' | 'tank' | 'seeker' | 'other';
-type Source = 'discord' | 'roster';
 
 interface Person {
   id: string;
@@ -71,6 +70,10 @@ function kindOf(className: string): Kind {
 }
 const isSin = (p: Person) => p.kind === 'sin';
 const isGuard = (p: Person) => p.kind === 'tank' || p.kind === 'seeker';
+// Роль у розподілі: танк і сікер взаємозамінні, тож «той самий» персонаж —
+// той самий нік у тій самій ролі (у людини можуть бути твіни різних класів).
+const roleOf = (k: Kind) => (k === 'tank' || k === 'seeker' ? 'guard' : k);
+const dupKey = (p: Person) => `${roleOf(p.kind)}|${norm(p.nickname)}`;
 
 function toggleIn(set: Set<string>, id: string): Set<string> {
   const next = new Set(set);
@@ -181,11 +184,13 @@ function PostSettings({ initial, onSaved }: { initial: RbSettings; onSaved: (s: 
   );
 }
 
-function OnlineColumns({ groups, isOn, onToggle, onAdd }: {
+function OnlineColumns({ groups, isOn, onToggle, onAdd, lockedNote }: {
   groups: Group[];
   isOn: (p: Person) => boolean;
   onToggle: (p: Person) => void;
   onAdd?: (groupKey: string, nick: string) => void;
+  /** Текст — людина вже в пулі з іншого джерела: показуємо відміченою й неклікабельною. */
+  lockedNote?: (p: Person) => string | null;
 }) {
   return (
     <div className="rb-online">
@@ -197,11 +202,22 @@ function OnlineColumns({ groups, isOn, onToggle, onAdd }: {
           </div>
           {g.people.length === 0 && <p className="hint" style={{ margin: '4px 0' }}>Нікого.</p>}
           {g.people.map((p) => {
-            const on = isOn(p);
+            const locked = lockedNote?.(p) ?? null;
+            const on = locked !== null || isOn(p);
             return (
-              <button key={p.id} type="button" className={'cal-act' + (on ? ' on' : '')} role="checkbox" aria-checked={on} onClick={() => onToggle(p)}>
+              <button
+                key={p.id}
+                type="button"
+                className={'cal-act' + (on ? ' on' : '') + (locked ? ' is-locked' : '')}
+                role="checkbox"
+                aria-checked={on}
+                disabled={locked !== null}
+                title={locked ?? undefined}
+                onClick={() => onToggle(p)}
+              >
                 <span className={'check' + (on ? ' is-on' : '')} aria-hidden="true"><IcoCheck /></span>
                 <span>{p.nickname}</span>
+                {locked && <small className="hint" style={{ marginLeft: 'auto' }}>{locked}</small>}
               </button>
             );
           })}
@@ -220,13 +236,13 @@ function RbManager() {
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
-
-  const [source, setSource] = useState<Source>('discord');
+  const [imageErr, setImageErr] = useState<string | null>(null);
 
   // Ростер.
   const [selectedClassIds, setSelectedClassIds] = useState<Set<string>>(new Set());
   const defaultsApplied = useRef(false);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  const [rosterOpen, setRosterOpen] = useState(true);
 
   // Discord.
   const [reactions, setReactions] = useState<RbReactionsResult | null>(null);
@@ -277,15 +293,15 @@ function RbManager() {
   }, []);
 
   useEffect(() => {
-    if (source === 'discord') loadReactions();
-  }, [source, loadReactions]);
+    loadReactions();
+  }, [loadReactions]);
 
   useEffect(() => {
-    if (source !== 'discord' || settings) return;
+    if (settings) return;
     fetchRbSettings()
       .then(setSettings)
       .catch((e) => setActionErr(errorMessage(e, 'Не вдалося прочитати налаштування поста (міграція 0010 виконана?).')));
-  }, [source, settings]);
+  }, [settings]);
 
   const postPoll = async () => {
     if (!confirm('Створити новий пост збору в Discord? Попередній пост збору буде прибрано, реакції почнуться з нуля.')) return;
@@ -340,7 +356,6 @@ function RbManager() {
         .filter((g) => g.people.length > 0),
     [classes, selectedClassIds, candidates],
   );
-  const rosterPeople = useMemo(() => rosterGroups.flatMap((g) => g.people).filter((p) => onlineIds.has(p.id)), [rosterGroups, onlineIds]);
 
   // --- Discord ---
   const discordGroups = useMemo<Group[]>(() => {
@@ -360,10 +375,19 @@ function RbManager() {
     setExtras((prev) => [...prev, { groupKey, person: { id: `x:${groupKey}:${Date.now()}`, nickname: nick, kind: kindOf(g.className) } }]);
   };
 
-  const people = source === 'discord' ? discordPeople : rosterPeople;
+  // Ростер лише доповнює Discord: нік, що вже прийшов звідти в тій самій
+  // ролі, з ростера не додаємо (інакше одна людина стоїть у пулі двічі).
+  const discordKeys = useMemo(() => new Set(discordPeople.map(dupKey)), [discordPeople]);
+  const rosterLocked = (p: Person) => (discordKeys.has(dupKey(p)) ? 'вже з Діскорду' : null);
+  const rosterPeople = useMemo(
+    () => rosterGroups.flatMap((g) => g.people).filter((p) => onlineIds.has(p.id) && !discordKeys.has(dupKey(p))),
+    [rosterGroups, onlineIds, discordKeys],
+  );
+
+  const people = useMemo(() => [...discordPeople, ...rosterPeople], [discordPeople, rosterPeople]);
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
 
-  // Зняли людину з «онлайн» або змінилось джерело — прибираємо її зі слотів.
+  // Зняли людину з «онлайн» — прибираємо її зі слотів.
   useEffect(() => {
     setSlots((prev) => {
       let changed = false;
@@ -417,7 +441,7 @@ function RbManager() {
 
   const copyImage = async () => {
     if (!printRef.current) return;
-    setActionErr(null);
+    setImageErr(null);
     try {
       const blob = await toBlob(printRef.current, { pixelRatio: 2, backgroundColor: bgColor() });
       if (!blob) throw new Error('Не вдалося згенерувати картинку.');
@@ -425,13 +449,13 @@ function RbManager() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      setActionErr(errorMessage(e, 'Не вдалося скопіювати картинку — спробуй «Завантажити PNG».'));
+      setImageErr(errorMessage(e, 'Не вдалося скопіювати картинку — спробуй «PNG».'));
     }
   };
 
   const downloadImage = async () => {
     if (!printRef.current) return;
-    setActionErr(null);
+    setImageErr(null);
     try {
       const url = await toPng(printRef.current, { pixelRatio: 2, backgroundColor: bgColor() });
       const a = document.createElement('a');
@@ -439,7 +463,7 @@ function RbManager() {
       a.download = 'rb-rozpodil.png';
       a.click();
     } catch (e) {
-      setActionErr(errorMessage(e, 'Не вдалося зберегти картинку.'));
+      setImageErr(errorMessage(e, 'Не вдалося зберегти картинку.'));
     }
   };
 
@@ -451,17 +475,14 @@ function RbManager() {
 
   return (
     <div className="stack">
-      <div className="toolbar" role="group" aria-label="Джерело людей">
+      <div className="toolbar">
         <span className="toolbar-label">Хто онлайн:</span>
-        <div className="seg">
-          <button type="button" className={source === 'discord' ? 'is-on' : ''} onClick={() => setSource('discord')}>З Діскорду (реакції)</button>
-          <button type="button" className={source === 'roster' ? 'is-on' : ''} onClick={() => setSource('roster')}>З ростера (вручну)</button>
-        </div>
-        <span className="hint">онлайн {people.length} · сінів {sinPool.length} · танків/сікерів {guardPool.length}</span>
+        <span className="hint">
+          усього {people.length} (з Діскорду {discordPeople.length} · з ростера {rosterPeople.length}) · сінів {sinPool.length} · танків/сікерів {guardPool.length}
+        </span>
       </div>
 
-      {source === 'discord' && (
-        <div className="panel">
+      <div className="panel">
           <div className="panel-head">
             <h3><IcoDiscord /> Хто онлайн — з Діскорду</h3>
             {poll ? <span className="badge good"><span className="dot live" /> пост є</span> : <span className="badge mute">поста немає</span>}
@@ -511,40 +532,52 @@ function RbManager() {
               />
             )}
           </div>
-        </div>
-      )}
+      </div>
 
-      {source === 'roster' && (
-        <div className="panel">
-          <div className="panel-head">
-            <h3><IcoUsers /> Хто онлайн — з ростера</h3>
-            <span className="panel-sub">обери класи й відміть, хто в грі</span>
-          </div>
-          <div className="panel-body tight" style={{ borderBottom: '1px solid var(--line)' }}>
-            <div className="chips">
-              {classes.length === 0 && <span className="hint">Спершу додай класи в Адмінці.</span>}
-              {classes.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={'chip' + (selectedClassIds.has(c.id) ? ' is-on' : '')}
-                  aria-pressed={selectedClassIds.has(c.id)}
-                  onClick={() => setSelectedClassIds((prev) => toggleIn(prev, c.id))}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="panel-body">
-            {rosterGroups.length === 0 ? (
-              <p className="hint">Нема персонажів вибраних класів — зміни вибір вище або додай гравців у «Гравці» / Адмінці.</p>
-            ) : (
-              <OnlineColumns groups={rosterGroups} isOn={(p) => onlineIds.has(p.id)} onToggle={(p) => setOnlineIds((prev) => toggleIn(prev, p.id))} />
-            )}
+      <div className="panel">
+        <div className="panel-head">
+          <h3><IcoUsers /> Додати з ростера</h3>
+          {rosterPeople.length > 0 && <span className="badge good">+{rosterPeople.length}</span>}
+          <span className="panel-sub">хто в грі, але без реакції — додаються до тих, хто з Діскорду</span>
+          <div className="panel-actions">
+            <button type="button" className="btn btn-quiet btn-xs" aria-expanded={rosterOpen} onClick={() => setRosterOpen((v) => !v)}>
+              {rosterOpen ? 'згорнути' : 'розгорнути'}
+            </button>
           </div>
         </div>
-      )}
+        {rosterOpen && (
+          <>
+            <div className="panel-body tight" style={{ borderBottom: '1px solid var(--line)' }}>
+              <div className="chips">
+                {classes.length === 0 && <span className="hint">Спершу додай класи в Адмінці.</span>}
+                {classes.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={'chip' + (selectedClassIds.has(c.id) ? ' is-on' : '')}
+                    aria-pressed={selectedClassIds.has(c.id)}
+                    onClick={() => setSelectedClassIds((prev) => toggleIn(prev, c.id))}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="panel-body">
+              {rosterGroups.length === 0 ? (
+                <p className="hint">Нема персонажів вибраних класів — зміни вибір вище або додай гравців у «Гравці» / Адмінці.</p>
+              ) : (
+                <OnlineColumns
+                  groups={rosterGroups}
+                  isOn={(p) => onlineIds.has(p.id)}
+                  onToggle={(p) => setOnlineIds((prev) => toggleIn(prev, p.id))}
+                  lockedNote={rosterLocked}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="panel">
         <div className="panel-head">
@@ -574,8 +607,6 @@ function RbManager() {
         </div>
         <div className="panel-foot">На боса: 1 Сін + 1 Танк/Сікер по черзі з відмічених онлайн; хто не влігся — в «Резерві».</div>
       </div>
-
-      {actionErr && source !== 'discord' && <p className="form-err">{actionErr}</p>}
 
       {selectedBosses.length > 0 && (
         <div className="split main-side">
@@ -647,6 +678,7 @@ function RbManager() {
               </div>
             </div>
             <div className="panel-body">
+              {imageErr && <p className="form-err" style={{ marginBottom: 10 }}>{imageErr}</p>}
               <div ref={printRef} className="rb-print">
                 <div className="rb-print-head">
                   <span className="eyebrow">Thunder</span>
