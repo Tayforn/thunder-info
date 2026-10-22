@@ -14,8 +14,7 @@ import { fetchGearItemComponents, fetchGearItems } from '../data/gearItems';
 import type { GearItemComponent, LootItem } from '../data/types';
 import { calcFarmWeeks } from '../data/khFarm';
 import { copyText } from '../app/clipboard';
-import { fetchLadderPreview, type LadderPreviewEntry } from '../data/ladderPreview';
-import { CALC_REFINE_URL, LADDER_PRIZE_CHESTS, LADDER_URL, PAST_TOURNAMENT_600, RECRUITMENT_OFFICERS } from '../data/community';
+import { CALC_REFINE_URL, LADDER_LAST_DRAW, LADDER_PRIZE_CHESTS, LADDER_URL, PAST_TOURNAMENT_600, RECRUITMENT_OFFICERS } from '../data/community';
 import { IcoBolt, IcoBook, IcoCheck, IcoClock, IcoCoins, IcoCopy, IcoDiscord, IcoShield, IcoSword, IcoTrophy, IcoUsers } from '../components/Icons';
 import PvpBlock from '../components/PvpBlock';
 
@@ -74,18 +73,6 @@ function CopyableNick({ nickname }: { nickname: string }) {
 export default function HomePage() {
   const [rows, setRows] = useState<GearFarmRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [ladderTop, setLadderTop] = useState<LadderPreviewEntry[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchLadderPreview(5)
-      .then((top) => !cancelled && setLadderTop(top))
-      .catch(() => !cancelled && setLadderTop([]));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     Promise.all([fetchLootItems(), fetchGearItems(), fetchGearItemComponents()])
@@ -173,22 +160,17 @@ export default function HomePage() {
               Хто підніме шмотку на найвищий рівень і за найменше спроб. Лідери вже далеко попереду, але рахується будь-яка
               спроба — доєднатися можна в будь-який момент.
             </p>
-            {ladderTop === null && <p className="loading"><span className="spinner" /> Завантаження…</p>}
-            {ladderTop !== null && ladderTop.length === 0 && <p className="hint">Поки що немає результатів.</p>}
-            {ladderTop !== null && ladderTop.length > 0 && (
-              <div className="stack sm">
-                {ladderTop.map((e, i) => (
-                  <div key={e.nickname} className="row between">
-                    <span className="row" style={{ gap: 8 }}>
-                      <span className={'medal' + (i < 3 ? ` m${i + 1}` : '')} style={{ width: 24, height: 24, fontSize: 11 }}>{i + 1}</span>
-                      <b>{e.nickname}</b>
-                    </span>
-                    <span className="badge mute">+{e.level} · {e.attempts} спроб</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="hint">Минулого розіграшу фонд {LADDER_PRIZE_CHESTS} скринь розподілили між топ-10 місць ладдера.</p>
+            <p className="hint">Підсумки минулого розіграшу — фонд {LADDER_PRIZE_CHESTS} скринь розподілили між топ-10 місць:</p>
+            <ol className="ladder-results">
+              {LADDER_LAST_DRAW.map((e, i) => (
+                <li key={e.nickname} className="ladder-result">
+                  <span className={'medal' + (i < 3 ? ` m${i + 1}` : '')} aria-hidden="true">{i + 1}</span>
+                  <span className="ladder-result-nick" title={e.nickname}>{e.nickname}</span>
+                  <span className="badge mute">+{e.level}</span>
+                  <span className="badge accent">{e.prizeChests} скринь</span>
+                </li>
+              ))}
+            </ol>
           </div>
           <div className="panel-foot">
             <a href={LADDER_URL} target="_blank" rel="noopener" className="link">Перейти до ладдера →</a>

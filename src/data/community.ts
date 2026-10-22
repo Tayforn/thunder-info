@@ -2,8 +2,8 @@
 // Сталі дані сусідніх проєктів сервера (ladder.thunderpw.fun,
 // calc.thunderpw.fun) і набору для блоків на Головній. Турніри й зал
 // слави з pvp.thunderpw.fun раніше були статичним знімком тут — тепер вони
-// тягнуться наживо з Supabase-проєкту pw-pvp (data/pvp.ts). Ладдер — той
-// самий Supabase-проєкт, що й thunder-info (data/ladderPreview.ts).
+// тягнуться наживо з Supabase-проєкту pw-pvp (data/pvp.ts). Підсумки
+// ладдера — статичний знімок минулого розіграшу (LADDER_LAST_DRAW).
 // =========================================================
 
 export const PVP_URL = 'https://pvp.thunderpw.fun/';
@@ -16,8 +16,30 @@ export const PAST_TOURNAMENT_600 = {
   prizeChests: 600,
 };
 
-/** Розподіл фонду минулого розіграшу ладдера (1000 скринь на топ-10 місць). */
+/** Фонд минулого розіграшу ладдера (розподілений між топ-10 місць). */
 export const LADDER_PRIZE_CHESTS = 1000;
+
+export interface LadderDrawResult {
+  nickname: string;
+  /** Рівень заточки, на який підняли шмотку. */
+  level: number;
+  /** Виграш за місце, скринь (таблиця нагород на ladder.thunderpw.fun). */
+  prizeChests: number;
+}
+
+/** Підсумки минулого розіграшу ладдера — топ-10 і виграш кожного місця. */
+export const LADDER_LAST_DRAW: LadderDrawResult[] = [
+  { nickname: 'DdCL (Ілля)', level: 12, prizeChests: 200 },
+  { nickname: 'МініСвиня (ОлекThunder) Шаман', level: 11, prizeChests: 160 },
+  { nickname: 'Abberath', level: 11, prizeChests: 125 },
+  { nickname: 'DudeIsFine', level: 10, prizeChests: 100 },
+  { nickname: 'Fye', level: 10, prizeChests: 90 },
+  { nickname: 'Infernoman(Арсен)', level: 10, prizeChests: 80 },
+  { nickname: '~FreeKill~', level: 10, prizeChests: 70 },
+  { nickname: 'Baguto', level: 10, prizeChests: 65 },
+  { nickname: 'mwNERO', level: 10, prizeChests: 60 },
+  { nickname: 'gIGAcHAD', level: 9, prizeChests: 50 },
+];
 
 export interface RecruitmentOfficer {
   nickname: string;
