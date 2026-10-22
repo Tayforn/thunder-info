@@ -75,22 +75,22 @@ function TextInput({ initial, placeholder, allowEmpty, className, onSave }: { in
   );
 }
 
-/** Примітка: кілька рядків, посилання тощо — textarea, що росте під вміст
- * (до ~160px, далі скрол). */
+/** Примітка: кілька рядків, посилання тощо. Мінімум ~4 рядки, тягнеться
+ * вниз за куток; під довгий текст сама росте (до 400px), але лише вгору —
+ * щоб не скидати висоту, яку адмін розтягнув руками. */
 function NoteInput({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setValue(initial), [initial]);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    if (!el || el.scrollHeight <= el.clientHeight) return;
+    el.style.height = Math.min(el.scrollHeight + 2, 400) + 'px';
   }, [value]);
   return (
     <textarea
       ref={ref}
-      rows={1}
+      rows={4}
       value={value}
       placeholder="Примітка: текст, посилання, кілька рядків — у пості йде під евентом, у «Події» — як опис (необов'язково)"
       onChange={(e) => setValue(e.target.value)}

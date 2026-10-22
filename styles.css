@@ -884,7 +884,7 @@ button.cal-act:hover:not(:disabled) { border-color: var(--line-2); background: v
 .ctl input.ctl-role { width: 180px; font-family: var(--font-mono); font-size: 12.5px; }
 .event-note-line { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 10px; align-items: start; }
 .event textarea {
-  width: 100%; padding: 8px 10px; font-size: 13.5px; line-height: 1.4; min-height: 36px; resize: none; overflow-y: auto;
+  width: 100%; padding: 10px 12px; font-size: 13.5px; line-height: 1.45; min-height: 96px; resize: vertical; overflow-y: auto;
   background-color: var(--ink-a1); border: 1px solid var(--line-2); border-radius: var(--radius); color: var(--text); font-family: inherit; color-scheme: dark;
 }
 .event textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--acc-rgb), 0.16); }
