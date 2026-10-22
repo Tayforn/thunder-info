@@ -13,8 +13,9 @@
 // calc.thunderpw.fun/rb — data/raidBosses.ts), «Розподілити» — на кожного
 // відміченого боса по черзі 1 Сін + 1 Танк/Сікер (хто не влігся — в
 // «Резерві»), селекти для ручних правок (лише своя роль, без уже
-// зайнятих), «Скинути» на рядок, і чистий текстовий блок-прев'ю, який
-// копіюють як картинку (html-to-image) у Діскорд.
+// зайнятих), колонка «Контролить» — вручну скільки завгодно людей інших
+// класів (або зайвих сінів/танків), «Скинути» на рядок, і чистий текстовий
+// блок-прев'ю, який копіюють як картинку (html-to-image) у Діскорд.
 //
 // Стан сторінки — лише в пам'яті вкладки; у Supabase пише лише функція
 // (який пост збору зараз активний).
@@ -44,12 +45,18 @@ interface Person {
   id: string;
   nickname: string;
   kind: Kind;
+  /** Назва класу — показуємо в колонці «Контролить», де класи змішані. */
+  cls: string;
 }
 
 interface Slot {
   sinId: string | null;
   guardId: string | null;
+  /** «Контролить» — будь-скільки людей інших класів, лише вручну. */
+  others: string[];
 }
+
+const EMPTY_SLOT: Slot = { sinId: null, guardId: null, others: [] };
 
 interface Group {
   key: string;
@@ -228,7 +235,44 @@ function OnlineColumns({ groups, isOn, onToggle, onAdd, lockedNote }: {
   );
 }
 
-const SLOT_COLS = 'minmax(110px, 1fr) minmax(150px, 1fr) minmax(150px, 1fr) 100px';
+/** Комірка «Контролить»: чіпи призначених (× — повернути в пул) + селект
+ * «+ додати» з вільних людей; інші класи — першими. */
+function OthersCell({ assigned, free, onAdd, onRemove }: {
+  assigned: Person[];
+  free: Person[];
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const otherCls = free.filter((p) => p.kind === 'other');
+  const rest = free.filter((p) => p.kind !== 'other');
+  return (
+    <span className="rb-others">
+      {assigned.map((p) => (
+        <span key={p.id} className="chip static rb-other-chip" title={p.cls}>
+          {p.nickname}
+          <button type="button" aria-label={`Прибрати ${p.nickname}`} onClick={() => onRemove(p.id)}>×</button>
+        </span>
+      ))}
+      {free.length > 0 && (
+        <select value="" aria-label="Додати, хто контролить" onChange={(e) => e.target.value && onAdd(e.target.value)}>
+          <option value="">+ додати</option>
+          {otherCls.length > 0 && (
+            <optgroup label="Інші класи">
+              {otherCls.map((p) => <option key={p.id} value={p.id}>{p.nickname} · {p.cls}</option>)}
+            </optgroup>
+          )}
+          {rest.length > 0 && (
+            <optgroup label="Сіни / Танки / Сікери">
+              {rest.map((p) => <option key={p.id} value={p.id}>{p.nickname} · {p.cls}</option>)}
+            </optgroup>
+          )}
+        </select>
+      )}
+    </span>
+  );
+}
+
+const SLOT_COLS = 'minmax(90px, 0.8fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(160px, 1.3fr) 84px';
 
 function RbManager() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
@@ -351,7 +395,7 @@ function RbManager() {
         .map((c) => ({
           key: c.id,
           title: <ClassBadge cls={c} />,
-          people: candidates.filter((p) => p.classId === c.id).map((p) => ({ id: p.id, nickname: p.nickname, kind: kindOf(c.name) })),
+          people: candidates.filter((p) => p.classId === c.id).map((p) => ({ id: p.id, nickname: p.nickname, kind: kindOf(c.name), cls: c.name })),
         }))
         .filter((g) => g.people.length > 0),
     [classes, selectedClassIds, candidates],
@@ -362,7 +406,7 @@ function RbManager() {
     if (!reactions?.poll) return [];
     return reactions.groups.map((g) => {
       const kind = kindOf(g.className);
-      const people: Person[] = g.people.map((u) => ({ id: `${g.classId}:${u.id}`, nickname: u.name, kind }));
+      const people: Person[] = g.people.map((u) => ({ id: `${g.classId}:${u.id}`, nickname: u.name, kind, cls: g.className }));
       extras.filter((x) => x.groupKey === g.classId).forEach((x) => people.push(x.person));
       return { key: g.classId, title: <span className="badge">{g.className}</span>, people };
     });
@@ -372,7 +416,7 @@ function RbManager() {
   const addExtra = (groupKey: string, nick: string) => {
     const g = reactions?.groups.find((x) => x.classId === groupKey);
     if (!g) return;
-    setExtras((prev) => [...prev, { groupKey, person: { id: `x:${groupKey}:${Date.now()}`, nickname: nick, kind: kindOf(g.className) } }]);
+    setExtras((prev) => [...prev, { groupKey, person: { id: `x:${groupKey}:${Date.now()}`, nickname: nick, kind: kindOf(g.className), cls: g.className } }]);
   };
 
   // Ростер лише доповнює Discord: нік, що вже прийшов звідти в тій самій
@@ -395,8 +439,9 @@ function RbManager() {
       for (const [bossId, s] of Object.entries(prev)) {
         const sinId = s.sinId && peopleById.has(s.sinId) ? s.sinId : null;
         const guardId = s.guardId && peopleById.has(s.guardId) ? s.guardId : null;
-        if (sinId !== s.sinId || guardId !== s.guardId) changed = true;
-        next[bossId] = { sinId, guardId };
+        const others = s.others.filter((id) => peopleById.has(id));
+        if (sinId !== s.sinId || guardId !== s.guardId || others.length !== s.others.length) changed = true;
+        next[bossId] = { sinId, guardId, others };
       }
       return changed ? next : prev;
     });
@@ -406,20 +451,32 @@ function RbManager() {
   const sinPool = people.filter(isSin);
   const guardPool = people.filter(isGuard);
 
+  // «Контролить» лишається як є — це ручні призначення; сінів і танків
+  // розкладаємо по черзі з тих, хто там не стоїть.
   const distribute = () => {
+    const controlling = new Set(selectedBosses.flatMap((b) => slots[b.id]?.others ?? []));
+    const sins = sinPool.filter((p) => !controlling.has(p.id));
+    const guards = guardPool.filter((p) => !controlling.has(p.id));
     const next: Record<string, Slot> = {};
     selectedBosses.forEach((b, i) => {
-      next[b.id] = { sinId: sinPool[i]?.id ?? null, guardId: guardPool[i]?.id ?? null };
+      next[b.id] = { sinId: sins[i]?.id ?? null, guardId: guards[i]?.id ?? null, others: slots[b.id]?.others ?? [] };
     });
     setSlots(next);
   };
 
-  const setSlot = (bossId: string, key: keyof Slot, personId: string) =>
-    setSlots((prev) => ({
-      ...prev,
-      [bossId]: { sinId: prev[bossId]?.sinId ?? null, guardId: prev[bossId]?.guardId ?? null, [key]: personId || null },
-    }));
-  const resetSlot = (bossId: string) => setSlots((prev) => ({ ...prev, [bossId]: { sinId: null, guardId: null } }));
+  const setSlot = (bossId: string, key: 'sinId' | 'guardId', personId: string) =>
+    setSlots((prev) => ({ ...prev, [bossId]: { ...(prev[bossId] ?? EMPTY_SLOT), [key]: personId || null } }));
+  const addOther = (bossId: string, personId: string) =>
+    setSlots((prev) => {
+      const s = prev[bossId] ?? EMPTY_SLOT;
+      return { ...prev, [bossId]: { ...s, others: [...s.others, personId] } };
+    });
+  const removeOther = (bossId: string, personId: string) =>
+    setSlots((prev) => {
+      const s = prev[bossId] ?? EMPTY_SLOT;
+      return { ...prev, [bossId]: { ...s, others: s.others.filter((id) => id !== personId) } };
+    });
+  const resetSlot = (bossId: string) => setSlots((prev) => ({ ...prev, [bossId]: EMPTY_SLOT }));
 
   const assignedIds = useMemo(() => {
     const ids = new Set<string>();
@@ -427,6 +484,7 @@ function RbManager() {
       const s = slots[b.id];
       if (s?.sinId) ids.add(s.sinId);
       if (s?.guardId) ids.add(s.guardId);
+      s?.others.forEach((id) => ids.add(id));
     });
     return ids;
   }, [slots, selectedBosses]);
@@ -436,6 +494,13 @@ function RbManager() {
   // слоті (поточне значення лишаємо, інакше селект «втратить» вибір).
   const optionsFor = (pool: Person[], current: string | null) => pool.filter((p) => p.id === current || !assignedIds.has(p.id));
   const nicknameOf = (id: string | null) => (id ? peopleById.get(id)?.nickname ?? '—' : '—');
+  const freePeople = people.filter((p) => !assignedIds.has(p.id));
+  const othersOf = (bossId: string) => (slots[bossId]?.others ?? []).map((id) => peopleById.get(id)).filter((p): p is Person => !!p);
+  // У картинці колонка «Контролить» — лише якщо там хоч хтось є.
+  const showOthers = selectedBosses.some((b) => (slots[b.id]?.others.length ?? 0) > 0);
+  const printCols = showOthers
+    ? 'minmax(100px, auto) minmax(110px, auto) minmax(110px, auto) minmax(130px, 260px)'
+    : 'minmax(110px, auto) minmax(130px, auto) minmax(130px, auto)';
 
   const bgColor = () => getComputedStyle(document.body).backgroundColor || '#111';
 
@@ -471,7 +536,7 @@ function RbManager() {
   if (loadErr) return <p className="form-err">{loadErr}</p>;
 
   const poll = reactions?.poll ?? null;
-  const filled = selectedBosses.filter((b) => slots[b.id]?.sinId || slots[b.id]?.guardId).length;
+  const filled = selectedBosses.filter((b) => slots[b.id]?.sinId || slots[b.id]?.guardId || slots[b.id]?.others.length).length;
 
   return (
     <div className="stack">
@@ -605,11 +670,11 @@ function RbManager() {
             ))}
           </div>
         </div>
-        <div className="panel-foot">На боса: 1 Сін + 1 Танк/Сікер по черзі з відмічених онлайн; хто не влігся — в «Резерві».</div>
+        <div className="panel-foot">На боса: 1 Сін + 1 Танк/Сікер по черзі з відмічених онлайн; хто не влігся — в «Резерві». Інші класи — вручну в колонку «Контролить».</div>
       </div>
 
       {selectedBosses.length > 0 && (
-        <div className="split main-side">
+        <div className="stack">
           <div className="panel">
             <div className="panel-head">
               <h3><IcoShuffle /> Розподіл</h3>
@@ -622,12 +687,14 @@ function RbManager() {
                   <span>Бос</span>
                   <span>Сін</span>
                   <span>Танк/Сікер</span>
+                  <span>Контролить</span>
                   <span></span>
                 </div>
                 {selectedBosses.map((b) => {
                   const slot = slots[b.id];
                   const sinId = slot?.sinId ?? null;
                   const guardId = slot?.guardId ?? null;
+                  const others = othersOf(b.id);
                   return (
                     <div key={b.id} className="rowlist-row" style={{ gridTemplateColumns: SLOT_COLS }}>
                       <span title={b.name} className="cell-nick"><b>{b.nick}</b></span>
@@ -647,8 +714,14 @@ function RbManager() {
                           ))}
                         </select>
                       </span>
+                      <OthersCell
+                        assigned={others}
+                        free={freePeople}
+                        onAdd={(id) => addOther(b.id, id)}
+                        onRemove={(id) => removeOther(b.id, id)}
+                      />
                       <span className="cell-actions">
-                        <button type="button" className="btn btn-quiet btn-xs" disabled={!sinId && !guardId} onClick={() => resetSlot(b.id)}>
+                        <button type="button" className="btn btn-quiet btn-xs" disabled={!sinId && !guardId && others.length === 0} onClick={() => resetSlot(b.id)}>
                           Скинути
                         </button>
                       </span>
@@ -667,7 +740,7 @@ function RbManager() {
             )}
           </div>
 
-          <div className="panel sticky">
+          <div className="panel">
             <div className="panel-head">
               <h3><IcoImage /> Картинка для гільдії</h3>
               <div className="panel-actions">
@@ -679,27 +752,33 @@ function RbManager() {
             </div>
             <div className="panel-body">
               {imageErr && <p className="form-err" style={{ marginBottom: 10 }}>{imageErr}</p>}
-              <div ref={printRef} className="rb-print">
-                <div className="rb-print-head">
-                  <span className="eyebrow">Thunder</span>
-                  <h3>Розподіл по РБ</h3>
-                </div>
-                <div className="rb-print-table">
-                  <div className="rb-print-row rb-print-row-head">
-                    <span>Бос</span>
-                    <span>Сін</span>
-                    <span>Танк/Сікер</span>
+              <div className="rb-print-scroll">
+                <div ref={printRef} className="rb-print">
+                  <div className="rb-print-head">
+                    <span className="eyebrow">Thunder</span>
+                    <h3>Розподіл по РБ</h3>
                   </div>
-                  {selectedBosses.map((b) => {
-                    const slot = slots[b.id];
-                    return (
-                      <div key={b.id} className="rb-print-row">
-                        <span className="rb-print-boss">{b.nick}</span>
-                        <span>{nicknameOf(slot?.sinId ?? null)}</span>
-                        <span>{nicknameOf(slot?.guardId ?? null)}</span>
-                      </div>
-                    );
-                  })}
+                  <div className="rb-print-table">
+                    <div className="rb-print-row rb-print-row-head" style={{ gridTemplateColumns: printCols }}>
+                      <span>Бос</span>
+                      <span>Сін</span>
+                      <span>Танк/Сікер</span>
+                      {showOthers && <span>Контролить</span>}
+                    </div>
+                    {selectedBosses.map((b) => {
+                      const slot = slots[b.id];
+                      return (
+                        <div key={b.id} className="rb-print-row" style={{ gridTemplateColumns: printCols }}>
+                          <span className="rb-print-boss">{b.nick}</span>
+                          <span>{nicknameOf(slot?.sinId ?? null)}</span>
+                          <span>{nicknameOf(slot?.guardId ?? null)}</span>
+                          {showOthers && (
+                            <span className="rb-print-others">{othersOf(b.id).map((p) => p.nickname).join(', ') || '—'}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

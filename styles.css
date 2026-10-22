@@ -859,8 +859,10 @@ button.cal-act:hover:not(:disabled) { border-color: var(--line-2); background: v
 .timeline-time { font-family: var(--font-head); font-weight: 700; font-size: 14px; color: var(--accent-3); font-variant-numeric: tabular-nums; padding-top: 1px; }
 .timeline-time.mute { color: var(--text-mute); font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; padding-top: 4px; white-space: nowrap; }
 .timeline-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.timeline-body b { font-size: 14px; }
+.timeline-body b { font-size: 14px; overflow-wrap: anywhere; }
 .timeline-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--text-mute); }
+/* Примітка часто — голе посилання без пробілів: без цього не переноситься і вилазить за панель. */
+.timeline-meta > span { min-width: 0; overflow-wrap: anywhere; }
 
 .event { display: flex; flex-direction: column; }
 .event .panel-head { gap: 8px 12px; padding: 8px 14px; }
@@ -917,10 +919,20 @@ button.cal-act:hover:not(:disabled) { border-color: var(--line-2); background: v
 .rb-online .cal-act { padding: 5px 8px; }
 .rb-add { margin-top: 4px; }
 .rb-online .cal-act.is-locked { cursor: default; opacity: 0.6; }
+.rb-others { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
+.rb-others select { flex: 1 1 110px; min-width: 0; }
+.rb-other-chip { height: 26px; padding: 0 4px 0 10px; font-size: 12.5px; gap: 2px; }
+.rb-other-chip button { background: none; border: 0; color: var(--text-mute); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+.rb-other-chip button:hover { color: var(--bad); }
+/* Картинка завжди обіймає свої рядки (width: max-content) — інакше у
+   вузькій панелі рядки вилазять за рамку і так потрапляють у PNG; якщо
+   панель вужча — горизонтальний скрол навколо, а не обрізаний знімок. */
+.rb-print-scroll { overflow-x: auto; }
 .rb-print {
-  display: inline-block; min-width: 320px; max-width: 100%; padding: 18px 22px 20px;
+  display: block; width: max-content; min-width: 320px; padding: 18px 22px 20px;
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); border: 1px solid var(--line-2); border-radius: var(--radius-lg);
 }
+.rb-print-others { white-space: normal; }
 .rb-print-head { margin-bottom: 12px; }
 .rb-print-head .eyebrow { margin-bottom: 4px; }
 .rb-print-head h3 { margin: 0; font-size: 20px; }
