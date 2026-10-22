@@ -9,6 +9,8 @@
 //  * Ростер: вибір класів (за замовчуванням Танк/Сікер/Сін) і чеклист
 //    персонажів з таблиці players — для тих, хто в грі, але не реагував.
 //    Нік, що вже прийшов з Discord (той самий клас-роль), не дублюється.
+//  * Твінки: імена, які адмін вписує сам (зберігаються в localStorage цього
+//    браузера); в авторозподіл не йдуть — лише в колонку «Контролить».
 // Далі: чеклист босів (статичний список, узгоджений з
 // calc.thunderpw.fun/rb — data/raidBosses.ts), «Розподілити» — на кожного
 // відміченого боса по черзі 1 Сін + 1 Танк/Сікер (хто не влігся — в
@@ -89,11 +91,40 @@ function toggleIn(set: Set<string>, id: string): Set<string> {
   return next;
 }
 
+interface Twink {
+  name: string;
+  on: boolean;
+}
+
+const TWINKS_KEY = 'thunder-rb-twinks';
+
+function loadTwinks(): Twink[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TWINKS_KEY) ?? '[]') as unknown;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((t): t is Twink => !!t && typeof t.name === 'string' && t.name.trim() !== '')
+      .map((t) => ({ name: t.name.trim(), on: !!t.on }));
+  } catch {
+    return [];
+  }
+}
+
+function saveTwinks(list: Twink[]): void {
+  try {
+    localStorage.setItem(TWINKS_KEY, JSON.stringify(list));
+  } catch {
+    /* приватний режим / заблоковане сховище — просто не запам'ятаємо */
+  }
+}
+
+const twinkId = (name: string) => `tw:${norm(name)}`;
+
 function kyivTime(iso: string | Date): string {
   return new Date(iso).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function AddPersonInput({ onAdd }: { onAdd: (nick: string) => void }) {
+function AddPersonInput({ onAdd, placeholder = '+ дописати нік' }: { onAdd: (nick: string) => void; placeholder?: string }) {
   const [value, setValue] = useState('');
   const commit = () => {
     const n = value.trim();
@@ -106,7 +137,7 @@ function AddPersonInput({ onAdd }: { onAdd: (nick: string) => void }) {
       type="text"
       className="input input-sm rb-add"
       value={value}
-      placeholder="+ дописати нік"
+      placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -191,13 +222,44 @@ function PostSettings({ initial, onSaved }: { initial: RbSettings; onSaved: (s: 
   );
 }
 
-function OnlineColumns({ groups, isOn, onToggle, onAdd, lockedNote }: {
+/** Колонка «Твінки»: імена вписує адмін; відмічені йдуть у пул (лише для
+ * колонки «Контролить»), × — прибрати зі списку зовсім. */
+function TwinksGroup({ twinks, onToggle, onRemove, onAdd }: {
+  twinks: Twink[];
+  onToggle: (name: string) => void;
+  onRemove: (name: string) => void;
+  onAdd: (name: string) => void;
+}) {
+  return (
+    <div className="rb-online-group rb-twinks">
+      <div className="rb-online-head">
+        <span className="badge">Твінки</span>
+        <span className="badge mute">{twinks.filter((t) => t.on).length} / {twinks.length}</span>
+      </div>
+      {twinks.length === 0 && <p className="hint" style={{ margin: '4px 0' }}>Впиши імена твінків — вони йтимуть у колонку «Контролить».</p>}
+      {twinks.map((t) => (
+        <div key={t.name} className="rb-twink">
+          <button type="button" className={'cal-act' + (t.on ? ' on' : '')} role="checkbox" aria-checked={t.on} onClick={() => onToggle(t.name)}>
+            <span className={'check' + (t.on ? ' is-on' : '')} aria-hidden="true"><IcoCheck /></span>
+            <span>{t.name}</span>
+          </button>
+          <button type="button" className="rb-twink-del" aria-label={`Прибрати твінка ${t.name}`} title="Прибрати зі списку" onClick={() => onRemove(t.name)}>×</button>
+        </div>
+      ))}
+      <AddPersonInput onAdd={onAdd} placeholder="+ ім'я твінка" />
+    </div>
+  );
+}
+
+function OnlineColumns({ groups, isOn, onToggle, onAdd, lockedNote, children }: {
   groups: Group[];
   isOn: (p: Person) => boolean;
   onToggle: (p: Person) => void;
   onAdd?: (groupKey: string, nick: string) => void;
   /** Текст — людина вже в пулі з іншого джерела: показуємо відміченою й неклікабельною. */
   lockedNote?: (p: Person) => string | null;
+  /** Додаткові колонки в ту саму сітку (напр. «Твінки»). */
+  children?: ReactNode;
 }) {
   return (
     <div className="rb-online">
@@ -231,6 +293,7 @@ function OnlineColumns({ groups, isOn, onToggle, onAdd, lockedNote }: {
           {onAdd && <AddPersonInput onAdd={(n) => onAdd(g.key, n)} />}
         </div>
       ))}
+      {children}
     </div>
   );
 }
@@ -243,7 +306,8 @@ function OthersCell({ assigned, free, onAdd, onRemove }: {
   onAdd: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
-  const otherCls = free.filter((p) => p.kind === 'other');
+  const twinkList = free.filter((p) => p.id.startsWith('tw:'));
+  const otherCls = free.filter((p) => p.kind === 'other' && !p.id.startsWith('tw:'));
   const rest = free.filter((p) => p.kind !== 'other');
   return (
     <span className="rb-others">
@@ -256,6 +320,11 @@ function OthersCell({ assigned, free, onAdd, onRemove }: {
       {free.length > 0 && (
         <select value="" aria-label="Додати, хто контролить" onChange={(e) => e.target.value && onAdd(e.target.value)}>
           <option value="">+ додати</option>
+          {twinkList.length > 0 && (
+            <optgroup label="Твінки">
+              {twinkList.map((p) => <option key={p.id} value={p.id}>{p.nickname}</option>)}
+            </optgroup>
+          )}
           {otherCls.length > 0 && (
             <optgroup label="Інші класи">
               {otherCls.map((p) => <option key={p.id} value={p.id}>{p.nickname} · {p.cls}</option>)}
@@ -287,6 +356,13 @@ function RbManager() {
   const defaultsApplied = useRef(false);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const [rosterOpen, setRosterOpen] = useState(true);
+  const [twinks, setTwinks] = useState<Twink[]>(loadTwinks);
+  const updateTwinks = (fn: (prev: Twink[]) => Twink[]) =>
+    setTwinks((prev) => {
+      const next = fn(prev);
+      saveTwinks(next);
+      return next;
+    });
 
   // Discord.
   const [reactions, setReactions] = useState<RbReactionsResult | null>(null);
@@ -428,7 +504,12 @@ function RbManager() {
     [rosterGroups, onlineIds, discordKeys],
   );
 
-  const people = useMemo(() => [...discordPeople, ...rosterPeople], [discordPeople, rosterPeople]);
+  const twinkPeople = useMemo<Person[]>(
+    () => twinks.filter((t) => t.on).map((t) => ({ id: twinkId(t.name), nickname: t.name, kind: 'other', cls: 'Твінк' })),
+    [twinks],
+  );
+
+  const people = useMemo(() => [...discordPeople, ...rosterPeople, ...twinkPeople], [discordPeople, rosterPeople, twinkPeople]);
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
 
   // Зняли людину з «онлайн» — прибираємо її зі слотів.
@@ -543,7 +624,7 @@ function RbManager() {
       <div className="toolbar">
         <span className="toolbar-label">Хто онлайн:</span>
         <span className="hint">
-          усього {people.length} (з Діскорду {discordPeople.length} · з ростера {rosterPeople.length}) · сінів {sinPool.length} · танків/сікерів {guardPool.length}
+          усього {people.length} (з Діскорду {discordPeople.length} · з ростера {rosterPeople.length} · твінків {twinkPeople.length}) · сінів {sinPool.length} · танків/сікерів {guardPool.length}
         </span>
       </div>
 
@@ -602,8 +683,8 @@ function RbManager() {
       <div className="panel">
         <div className="panel-head">
           <h3><IcoUsers /> Додати з ростера</h3>
-          {rosterPeople.length > 0 && <span className="badge good">+{rosterPeople.length}</span>}
-          <span className="panel-sub">хто в грі, але без реакції — додаються до тих, хто з Діскорду</span>
+          {rosterPeople.length + twinkPeople.length > 0 && <span className="badge good">+{rosterPeople.length + twinkPeople.length}</span>}
+          <span className="panel-sub">хто в грі, але без реакції, і твінки — додаються до тих, хто з Діскорду</span>
           <div className="panel-actions">
             <button type="button" className="btn btn-quiet btn-xs" aria-expanded={rosterOpen} onClick={() => setRosterOpen((v) => !v)}>
               {rosterOpen ? 'згорнути' : 'розгорнути'}
@@ -629,16 +710,24 @@ function RbManager() {
               </div>
             </div>
             <div className="panel-body">
-              {rosterGroups.length === 0 ? (
-                <p className="hint">Нема персонажів вибраних класів — зміни вибір вище або додай гравців у «Гравці» / Адмінці.</p>
-              ) : (
-                <OnlineColumns
-                  groups={rosterGroups}
-                  isOn={(p) => onlineIds.has(p.id)}
-                  onToggle={(p) => setOnlineIds((prev) => toggleIn(prev, p.id))}
-                  lockedNote={rosterLocked}
-                />
+              {rosterGroups.length === 0 && (
+                <p className="hint" style={{ marginBottom: 10 }}>Нема персонажів вибраних класів — зміни вибір вище або додай гравців у «Гравці» / Адмінці.</p>
               )}
+              <OnlineColumns
+                groups={rosterGroups}
+                isOn={(p) => onlineIds.has(p.id)}
+                onToggle={(p) => setOnlineIds((prev) => toggleIn(prev, p.id))}
+                lockedNote={rosterLocked}
+              >
+                <TwinksGroup
+                  twinks={twinks}
+                  onToggle={(name) => updateTwinks((prev) => prev.map((t) => (t.name === name ? { ...t, on: !t.on } : t)))}
+                  onRemove={(name) => updateTwinks((prev) => prev.filter((t) => t.name !== name))}
+                  onAdd={(name) =>
+                    updateTwinks((prev) => (prev.some((t) => norm(t.name) === norm(name)) ? prev : [...prev, { name, on: true }]))
+                  }
+                />
+              </OnlineColumns>
             </div>
           </>
         )}
