@@ -521,6 +521,10 @@ button.badge:hover:not(:disabled) { border-color: var(--text-dim); }
   background-repeat: no-repeat; background-position: right 12px center;
 }
 .field select option, .rowlist-row select option, select.input option { background: var(--bg-2); color: var(--text); padding: 8px; }
+/* Заголовки груп у випадайці — інакше браузер малює їх білими смугами. */
+.field select optgroup, .rowlist-row select optgroup, select.input optgroup {
+  background: var(--bg-1); color: var(--accent-3); font-style: normal; font-weight: 700; font-size: 12px;
+}
 .input-sm, .rowlist-row input, .rowlist-row select { height: 32px; font-size: 13.5px; padding: 0 10px; }
 .rowlist-row select { padding-right: 28px; background-position: right 9px center; }
 .field-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
@@ -919,6 +923,14 @@ button.cal-act:hover:not(:disabled) { border-color: var(--line-2); background: v
 .rb-online .cal-act { padding: 5px 8px; }
 .rb-add { margin-top: 4px; }
 .rb-online .cal-act.is-locked { cursor: default; opacity: 0.6; }
+.rb-twinks { border-style: dashed; }
+.rb-twink { display: flex; gap: 4px; align-items: stretch; }
+.rb-twink .cal-act { flex: 1 1 auto; min-width: 0; }
+.rb-twink-del {
+  flex: 0 0 auto; width: 30px; border: 1px solid var(--line); border-radius: var(--radius); background: none;
+  color: var(--text-mute); cursor: pointer; font-size: 16px; line-height: 1;
+}
+.rb-twink-del:hover { color: var(--bad); border-color: rgba(var(--bad-rgb), 0.5); }
 .rb-others { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
 .rb-others select { flex: 1 1 110px; min-width: 0; }
 .rb-other-chip { height: 26px; padding: 0 4px 0 10px; font-size: 12.5px; gap: 2px; }
